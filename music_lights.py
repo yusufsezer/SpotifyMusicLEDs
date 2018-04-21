@@ -49,7 +49,7 @@ class SpotifyVisualizer():
 
     def load_curr_track(self):
         self.track = self.sp.current_user_playing_track()
-        while self.track == None:
+        while not self.track:
             self.track = self.sp.current_user_playing_track()
             time.sleep(1)
         self.reset_track()
