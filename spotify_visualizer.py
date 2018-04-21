@@ -147,8 +147,13 @@ class SpotifyVisualizer():
 
 if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and visualize the currently playing track
+    print("Initializing Spotify Visualizer")
     visualizer = SpotifyVisualizer()
+    print("Authorizing")
     visualizer.authorize()
+    print("Loading Track Data")
     visualizer.load_curr_track()
+    print("Syncing")
     visualizer.sync()
+    print("Starting visualization")
     visualizer.visualize()
