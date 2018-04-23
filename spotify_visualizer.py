@@ -45,7 +45,7 @@ class SpotifyVisualizer():
 
     def _continue_loading_data(self):
         while len(self.segments) > 0:
-            time.sleep(7)
+            time.sleep(3)
             self._load_track_data()
 
     def _load_track_data(self):
@@ -63,7 +63,7 @@ class SpotifyVisualizer():
             self.segments = analysis["segments"]
             self.track_duration = self.track["item"]["duration_ms"]/1000
 
-        # Extract useful data for the next 15 seconds of playback
+        # Extract useful data for the next 7 seconds of playback
         i = 0
         s_t = []
         l = []
@@ -76,7 +76,7 @@ class SpotifyVisualizer():
             l.append(l_)
             pitch_lists.append(p)
             i += 1
-            if i > len(self.segments) - 1 or round(self.segments[i]["start"])  == round(self.segments[0]["start"] + 15):
+            if i > len(self.segments) - 1 or round(self.segments[i]["start"])  == round(self.segments[0]["start"] + 7):
                 self.segments = self.segments[i-1:] # remove the analyzed data from segments
                 break
         start_times = np.array(s_t)
