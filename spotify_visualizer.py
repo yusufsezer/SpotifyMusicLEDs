@@ -184,7 +184,8 @@ class SpotifyVisualizer():
                     print("Song Visualization Finished.")
                     break
             end = time.perf_counter()
-            time.sleep(sample_rate - (end-start))
+            diff = sample_rate - (end-start)
+            time.sleep(diff if diff > 0 else 0)
 
 if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and visualize the currently playing track
