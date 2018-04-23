@@ -45,6 +45,7 @@ class SpotifyVisualizer():
 
     def _continue_loading_data(self):
         while len(self.segments) > 0:
+            time.sleep(7)
             self._load_track_data()
 
     def _load_track_data(self):
