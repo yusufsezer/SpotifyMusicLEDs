@@ -5,6 +5,7 @@ import spotipy.util as util
 import numpy as np
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 from scipy.interpolate import interp1d
+from dotstar import Adafruit_DotStar
 
 class SpotifyVisualizer():
 
@@ -16,6 +17,8 @@ class SpotifyVisualizer():
         self.track_duration = None
         self.interpolated_loudness_func = None
         self.interpolated_pitch_funcs = None
+        self.numpixels = 240
+        self.strip = Adafruit_DotStar(self.numpixels, 12000000)
 
     def authorize(self, scope="user-modify-playback-state"):
         """
@@ -132,7 +135,8 @@ class SpotifyVisualizer():
         :param sample_rate: how frequently to sample song data
         :return: None
         """
-
+        strip.begin()
+        strip.setBrightness(100)
         if not self.sp.current_playback()["is_playing"]:
             self.sp.start_playback()
         while self.playback_pos <= self.track_duration:
@@ -142,6 +146,7 @@ class SpotifyVisualizer():
                 thread = threading.Thread(target=self.sync_within_margin, kwargs={"margin": 0.1})
                 thread.start()
             print(self.playback_pos, ": ", self.interpolated_loudness_func(self.playback_pos))
+            strip.setBrightness(235 - (235 * self.interpolated_loudness_func(self.playback_pos))/100)
             end = time.perf_counter()
             time.sleep(sample_rate - (end-start))
 
