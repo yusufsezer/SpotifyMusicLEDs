@@ -19,6 +19,9 @@ class SpotifyVisualizer():
         self.interpolated_pitch_funcs = None
         self.numpixels = 240
         self.strip = Adafruit_DotStar(self.numpixels, 12000000)
+        self.interpolated_loudness_buffer = []
+        self.interpolated_pitch_buffer = []
+        self.segments = None
 
     def authorize(self, scope="user-modify-playback-state"):
         """
@@ -38,12 +41,17 @@ class SpotifyVisualizer():
         """
         Pauses track and seeks to beginning
 
-        :return; None
+        :return: None
         """
 
         if self.sp.current_playback()["is_playing"]:
             self.sp.pause_playback()
         self.sp.seek_track(0)
+
+    def _continue_loading_data(self):
+        while len(self.segments) > 0:
+            time.sleep(3)
+            self._load_track_data()
 
     def _load_track_data(self):
         """
@@ -52,23 +60,45 @@ class SpotifyVisualizer():
         :return: None
         """
 
-        # Get track audio data for current song from Spotipy API
-        analysis = self.sp.audio_analysis(self.track["item"]["id"])
-        segments = analysis["segments"]
-        self.track_duration = self.track["item"]["duration_ms"]/1000
+        print("____________________________STARTED LOADING MORE DATA_______________________")
 
-        # Extract useful data
-        s_t = [segment["start"] for segment in segments]
+        # Get track audio data for current song from Spotipy API if necessary
+        if not self.segments:
+            analysis = self.sp.audio_analysis(self.track["item"]["id"])
+            self.segments = analysis["segments"]
+            self.track_duration = self.track["item"]["duration_ms"]/1000
+
+        # Extract useful data for the next 7 seconds of playback
+        i = 0
+        s_t = []
+        l = []
+        pitch_lists = []
+        while True:
+            t = self.segments[i]["start"]
+            l_ = self.segments[i]["loudness_start"]
+            p = self.segments[i]["pitches"]
+            s_t.append(t)
+            l.append(l_)
+            pitch_lists.append(p)
+            i += 1
+            if i > len(self.segments) - 1 or round(self.segments[i]["start"])  == round(self.segments[0]["start"] + 7):
+                self.segments = self.segments[i-1:] # remove the analyzed data from segments
+                break
         start_times = np.array(s_t)
-        l = [segment["loudness_start"] for segment in segments]
         loudnesses = np.array(l)
 
         # Perform data interpolation
-        self.interpolated_loudness_func = interp1d(start_times, loudnesses)
-        pitch_lists = [segment["pitches"] for segment in segments]
-        self.interpolated_pitch_funcs = []
+        interpolated_loudness_func = interp1d(start_times, loudnesses)
+        interpolated_pitch_funcs = []
         for w in range(12):
-            self.interpolated_pitch_funcs.append(interp1d(start_times, [pitch_list[w] for pitch_list in pitch_lists], kind="cubic"))
+            interpolated_pitch_funcs.append(interp1d(start_times, [pitch_list[w] for pitch_list in pitch_lists], kind="cubic"))
+
+        # Add interpolated functions to buffers to be used when needed
+        self.interpolated_loudness_buffer.append(interpolated_loudness_func)
+        self.interpolated_pitch_buffer.append(interpolated_pitch_funcs)
+        print(len(self.interpolated_loudness_buffer))
+
+        print("************************************FINISHED LOADING MORE DATA********************************")
 
     def load_curr_track(self):
         """
@@ -77,8 +107,9 @@ class SpotifyVisualizer():
         :return: None
         """
         self.track = self.sp.current_user_playing_track()
-        while self.track == None:
+        while not self.track:
             self.track = self.sp.current_user_playing_track()
+            print("Waiting for an active Spotify track.")
             time.sleep(1)
         self._reset_track()
         self._load_track_data()
@@ -98,7 +129,7 @@ class SpotifyVisualizer():
         playback_time = self.sp.current_playback()["progress_ms"] / 1000
         end = time.perf_counter()
         diff = abs((playback_time - 3*(end - start)) - t)
-        print("DIFF: ", diff, diff < margin)
+        print("Sync difference: ", diff, diff < margin)
         return diff < margin
 
     def sync_within_margin(self, t=None, margin=1.0):
@@ -137,6 +168,9 @@ class SpotifyVisualizer():
         """
         strip.begin()
         strip.setBrightness(100)
+        loudness = self.interpolated_loudness_buffer.pop(0)
+        threading.Thread(target=self._continue_loading_data).start()
+
         if not self.sp.current_playback()["is_playing"]:
             self.sp.start_playback()
         while self.playback_pos <= self.track_duration:
@@ -145,15 +179,31 @@ class SpotifyVisualizer():
             if abs(round(self.playback_pos))%1 == 0 and abs(self.playback_pos-round(self.playback_pos)) < sample_rate/2:
                 thread = threading.Thread(target=self.sync_within_margin, kwargs={"margin": 0.1})
                 thread.start()
-            print(self.playback_pos, ": ", self.interpolated_loudness_func(self.playback_pos))
-            strip.setBrightness(235 - (235 * self.interpolated_loudness_func(self.playback_pos))/100)
+
+            # Attempt to print interpolated loudness
+            try:
+                print(self.playback_pos, ": ", loudness(self.playback_pos))
+                strip.setBrightness(235 - (235 * abs(loudness(self.playback_pos)/100)))
+            # If loudness value out of range, get data for next 15 seconds of song or terminate if song has ended
+            except:
+                if len(self.interpolated_loudness_buffer) > 0:
+                    loudness = self.interpolated_loudness_buffer.pop(0)
+                else:
+                    print("Song Visualization Finished.")
+                    break
             end = time.perf_counter()
-            time.sleep(sample_rate - (end-start))
+            diff = sample_rate - (end-start)
+            time.sleep(diff if diff > 0 else 0)
 
 if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and visualize the currently playing track
+    print("Initializing Spotify Visualizer")
     visualizer = SpotifyVisualizer()
+    print("Authorizing")
     visualizer.authorize()
+    print("Loading Track Data")
     visualizer.load_curr_track()
+    print("Syncing")
     visualizer.sync()
+    print("Starting visualization")
     visualizer.visualize()
