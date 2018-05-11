@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import time
 import spotipy
 import threading
@@ -5,8 +6,7 @@ import spotipy.util as util
 import numpy as np
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 from scipy.interpolate import interp1d
-from dotstar import Adafruit_DotStar
-
+import apa102
 class SpotifyVisualizer():
 
     def __init__(self):
@@ -18,7 +18,7 @@ class SpotifyVisualizer():
         self.interpolated_loudness_func = None
         self.interpolated_pitch_funcs = None
         self.numpixels = 240
-        self.strip = Adafruit_DotStar(self.numpixels, 12000000)
+        self.strip = apa102.APA102(num_led=240, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.segments = None
@@ -60,8 +60,6 @@ class SpotifyVisualizer():
         :return: None
         """
 
-        print("____________________________STARTED LOADING MORE DATA_______________________")
-
         # Get track audio data for current song from Spotipy API if necessary
         if not self.segments:
             analysis = self.sp.audio_analysis(self.track["item"]["id"])
@@ -96,9 +94,6 @@ class SpotifyVisualizer():
         # Add interpolated functions to buffers to be used when needed
         self.interpolated_loudness_buffer.append(interpolated_loudness_func)
         self.interpolated_pitch_buffer.append(interpolated_pitch_funcs)
-        print(len(self.interpolated_loudness_buffer))
-
-        print("************************************FINISHED LOADING MORE DATA********************************")
 
     def load_curr_track(self):
         """
@@ -125,9 +120,9 @@ class SpotifyVisualizer():
 
         if t is None:
             t = self.playback_pos
-        start = time.perf_counter()
+        start = time.clock()
         playback_time = self.sp.current_playback()["progress_ms"] / 1000
-        end = time.perf_counter()
+        end = time.clock()
         diff = abs((playback_time - 3*(end - start)) - t)
         print("Sync difference: ", diff, diff < margin)
         return diff < margin
@@ -153,10 +148,11 @@ class SpotifyVisualizer():
         :return: None
         """
 
-        start = time.perf_counter()
+        start = time.clock()
         playback_time = self.sp.current_playback()["progress_ms"] / 1000
-        end = time.perf_counter()
-        t = playback_time + 0.3*(end - start)
+        end = time.clock()
+        print("--------------------------SYNC-------------------------")
+        t = playback_time 
         self.playback_pos = t if t > 0 else 0
 
     def visualize(self, sample_rate=0.03):
@@ -166,24 +162,30 @@ class SpotifyVisualizer():
         :param sample_rate: how frequently to sample song data
         :return: None
         """
-        strip.begin()
-        strip.setBrightness(100)
+
         loudness = self.interpolated_loudness_buffer.pop(0)
         threading.Thread(target=self._continue_loading_data).start()
 
         if not self.sp.current_playback()["is_playing"]:
             self.sp.start_playback()
         while self.playback_pos <= self.track_duration:
-            start = time.perf_counter()
+            start = time.clock()
             self.playback_pos += sample_rate
             if abs(round(self.playback_pos))%1 == 0 and abs(self.playback_pos-round(self.playback_pos)) < sample_rate/2:
                 thread = threading.Thread(target=self.sync_within_margin, kwargs={"margin": 0.1})
                 thread.start()
-
             # Attempt to print interpolated loudness
             try:
+                vol_range_min = 4
+                vol_range = 50
+                normalized = (abs(loudness(self.playback_pos)) - vol_range_min)/vol_range
+                length = int(240*(1 - normalized))
+                bright = (1-normalized)*100
                 print(self.playback_pos, ": ", loudness(self.playback_pos))
-                strip.setBrightness(235 - (235 * abs(loudness(self.playback_pos)/100)))
+                print(length)
+                self.strip.fill(length, 240, 0, 0, 0, 0)
+                self.strip.fill(0, length, 0, 240, 0, 100)
+                self.strip.show()
             # If loudness value out of range, get data for next 15 seconds of song or terminate if song has ended
             except:
                 if len(self.interpolated_loudness_buffer) > 0:
@@ -191,7 +193,7 @@ class SpotifyVisualizer():
                 else:
                     print("Song Visualization Finished.")
                     break
-            end = time.perf_counter()
+            end = time.clock()
             diff = sample_rate - (end-start)
             time.sleep(diff if diff > 0 else 0)
 
