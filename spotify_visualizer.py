@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import time
+import datetime
 import spotipy
 import threading
 import spotipy.util as util
 import numpy as np
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 from scipy.interpolate import interp1d
-import apa102
+# import apa102
 class SpotifyVisualizer():
 
     def __init__(self):
@@ -18,7 +19,7 @@ class SpotifyVisualizer():
         self.interpolated_loudness_func = None
         self.interpolated_pitch_funcs = None
         self.numpixels = 240
-        self.strip = apa102.APA102(num_led=240, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
+        # self.strip = apa102.APA102(num_led=240, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.segments = None
@@ -148,11 +149,16 @@ class SpotifyVisualizer():
         :return: None
         """
 
-        start = time.clock()
-        playback_time = self.sp.current_playback()["progress_ms"] / 1000
-        end = time.clock()
+        # start = time.clock()
+        call = self.sp.current_playback()
+        local_time = int(round(time.time() * 1000))
+        playback_time = call["progress_ms"] / 1000
+        timestamp = call["timestamp"]
+        # end = time.clock()
         print("--------------------------SYNC-------------------------")
-        t = playback_time 
+        diff = (local_time - timestamp) / 100000
+        print("DIFFFFFF: ", diff)
+        t = playback_time + diff
         self.playback_pos = t if t > 0 else 0
 
     def visualize(self, sample_rate=0.03):
@@ -183,9 +189,9 @@ class SpotifyVisualizer():
                 bright = (1-normalized)*100
                 print(self.playback_pos, ": ", loudness(self.playback_pos))
                 print(length)
-                self.strip.fill(length, 240, 0, 0, 0, 0)
-                self.strip.fill(0, length, 0, 240, 0, 100)
-                self.strip.show()
+                # self.strip.fill(length, 240, 0, 0, 0, 0)
+                # self.strip.fill(0, length, 0, 240, 0, 100)
+                # self.strip.show()
             # If loudness value out of range, get data for next 15 seconds of song or terminate if song has ended
             except:
                 if len(self.interpolated_loudness_buffer) > 0:
