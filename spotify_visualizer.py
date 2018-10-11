@@ -23,6 +23,21 @@ class SpotifyVisualizer():
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.data_segments = None
+        self.light_segments = {i:(20*i, 20*(i+1)-1) for i in range(12)}
+        self.segment_colors = {
+            0: (0xBF, 0x00, 0x5E),
+            1: (0xC2, 0x00, 0xC1),
+            2: (0x64, 0x00, 0xC5),
+            3: (0x10, 0x00, 0xC9),
+            4: (0x00, 0x65, 0xCC),
+            5: (0x00, 0xCF, 0xD0),
+            6: (0x00, 0xD3, 0x6A),
+            7: (0x00, 0xD7, 0x00),
+            8: (0x6C, 0xDA, 0x00),
+            9: (0xDD, 0xDE, 0x00),
+            10: (0xE1, 0x70, 0x00),
+            11: (0xE5, 0x00, 0x00)
+        }
 
     def get_rtt(hostname):
         """
@@ -138,7 +153,7 @@ class SpotifyVisualizer():
         interpolated_pitch_funcs = []
         for w in range(12):
             interpolated_pitch_funcs.append(
-                interp1d(start_times, [pitch_list[w] for pitch_list in pitch_lists], kind="cubic"))
+                interp1d(start_times, [pitch_list[w] if pitch_list[w] >= 0 else 0 for pitch_list in pitch_lists]))
         # Add interpolated functions to buffers to be used when needed
         self.interpolated_loudness_buffer.append(interpolated_loudness_func)
         self.interpolated_pitch_buffer.append(interpolated_pitch_funcs)
@@ -163,6 +178,9 @@ class SpotifyVisualizer():
         """
 
         loudness = self.interpolated_loudness_buffer.pop(0)
+        pitches = self.interpolated_pitch_buffer.pop(0)
+        self.strip.fill(0, 240, 0, 0, 0, 0)
+        self.strip.show()
 
         if not self.sp.current_playback()["is_playing"]:
             self.sp.start_playback()
@@ -171,18 +189,16 @@ class SpotifyVisualizer():
         while self.playback_pos <= self.track_duration:
             start = time.clock()
             try:
-                l = loudness(self.playback_pos)
-                vol_range_min = 4
-                vol_range = 50
-                normalized = (abs(l) - vol_range_min) / vol_range
-                length = int(240 * (1 - normalized))
-                self.strip.fill(length, 240, 0, 0, 0, 0)
-                self.strip.fill(0, length, 0, 240, 0, 100)
+                pos = self.playback_pos
+                for key in self.light_segments:
+                    start, end = self.light_segments[key]
+                    r, g, b = self.segment_colors[key]
+                    self.strip.fill(start, end, r, g, b, int(100 * pitches[w](pos)))
                 self.strip.show()
-            # If loudness value out of range, get data for next 7 seconds of song or terminate if song has ended
+            # If pitch value out of range, get data for next 7 seconds of song or terminate if song has ended
             except:
-                if len(self.interpolated_loudness_buffer) > 0:
-                    loudness = self.interpolated_loudness_buffer.pop(0)
+                if len(self.interpolated_pitch_buffer) > 0:
+                    pitches = self.interpolated_pitch_buffer.pop(0)
                 else:
                     print("Song Visualization Finished.")
                     break
