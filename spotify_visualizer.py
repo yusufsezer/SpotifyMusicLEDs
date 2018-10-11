@@ -7,7 +7,7 @@ import spotipy.util as util
 import numpy as np
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 from scipy.interpolate import interp1d
-# import apa102
+import apa102
 class SpotifyVisualizer():
 
     def __init__(self):
@@ -19,7 +19,7 @@ class SpotifyVisualizer():
         self.interpolated_loudness_func = None
         self.interpolated_pitch_funcs = None
         self.numpixels = 240
-        # self.strip = apa102.APA102(num_led=240, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
+        self.strip = apa102.APA102(num_led=240, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.data_segments = None
@@ -30,12 +30,12 @@ class SpotifyVisualizer():
 
         :return: RTT in ms
         """
-
-        ping = subprocess.Popen(["ping.exe", hostname], stdout=subprocess.PIPE)
-        tokenized_ping_result = str(ping.communicate()[0]).split(" ")
-        avg_rtt = tokenized_ping_result[-1][:-7]
-        print("-----------------AVERAGE RTT: %dms--------------------" % int(avg_rtt))
-        return int(avg_rtt)
+        
+        ping = subprocess.Popen(["ping", "-c", "3", hostname], stdout=subprocess.PIPE)
+        tokenized_ping_result = str(ping.communicate()[0]).split("/")
+        avg_rtt = tokenized_ping_result[-3]
+        print("-----------------SYNCING WITH AVERAGE RTT: %fms--------------------" % float(avg_rtt))
+        return float(avg_rtt)
 
     def authorize(self, scope="user-modify-playback-state"):
         """
@@ -63,7 +63,7 @@ class SpotifyVisualizer():
         while not self.track:
             self.track = self.sp.current_user_playing_track()
             time.sleep(1)
-        print(f"Loaded Track {self.track}")
+        print("Loaded Track %s" % self.track)
         self._reset_track()
         self._load_track_data()
 
@@ -172,7 +172,13 @@ class SpotifyVisualizer():
             start = time.clock()
             try:
                 l = loudness(self.playback_pos)
-                print(self.playback_pos, ": ", l)
+                vol_range_min = 4
+                vol_range = 50
+                normalized = (abs(l) - vol_range_min) / vol_range
+                length = int(240 * (1 - normalized))
+                self.strip.fill(length, 240, 0, 0, 0, 0)
+                self.strip.fill(0, length, 0, 240, 0, 100)
+                self.strip.show()
             # If loudness value out of range, get data for next 7 seconds of song or terminate if song has ended
             except:
                 if len(self.interpolated_loudness_buffer) > 0:
