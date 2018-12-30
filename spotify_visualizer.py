@@ -286,8 +286,10 @@ class SpotifyVisualizer:
         loudness = loudness_func(pos)
         print("%f: %f" % (pos, loudness))
         length = int(self.num_pixels * SpotifyVisualizer._normalize_loudness(loudness))
-        self.strip.fill(length, 240, 0, 0, 0, 0)
-        self.strip.fill(0, length, 0, 240, 0, 100)
+        mid = self.num_pixels/2
+        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
+        self.strip.fill(mid - (length/2), mid - 1, 0, 245, 0, 100)
+        self.strip.fill(mid, mid + (length/2), 0, 245, 0, 100)
         self.strip.show()
 
     @staticmethod
