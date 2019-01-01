@@ -322,6 +322,8 @@ class SpotifyVisualizer:
         """Reset certain attributes to prepare to visualize a new track.
         """
         self.should_terminate = False
+        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
+        self.strip.show()
         self.track = None
         self.track_id = None
         self.track_duration = None
