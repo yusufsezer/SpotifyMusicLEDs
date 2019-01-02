@@ -287,13 +287,35 @@ class SpotifyVisualizer:
         loudness = loudness_func(pos)
         print("%f: %f" % (pos, loudness))
         length = int(self.num_pixels * SpotifyVisualizer._normalize_loudness(loudness))
-        mid = 119
-        #self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
-        self.strip.fill(mid - (length//2), mid, 0, 240, 0, 100)
-        #self.strip.fill(mid - (length//2), mid, 0, 240, 0, 100)
-        self.strip.fill(mid, mid + (length//2), 0, 240, 0, 100)
-        self.strip.fill(1, mid-(length//2), 0, 0, 0, 0)
-        self.strip.fill(mid+(length//2), self.num_pixels, 0, 0, 0, 0)
+        pitch_colors = {
+             0: (0xBF, 0x00, 0x5E),
+             1: (0xC2, 0x00, 0xC1),
+             2: (0x64, 0x00, 0xC5),
+             3: (0x10, 0x00, 0xC9),
+             4: (0x00, 0x65, 0xCC),
+             5: (0x00, 0xCF, 0xD0),
+             6: (0x00, 0xD3, 0x6A),
+             7: (0x00, 0xD7, 0x00),
+             8: (0x6C, 0xDA, 0x00),
+             9: (0xDD, 0xDE, 0x00),
+             10: (0xE1, 0x70, 0x00),
+             11: (0xE5, 0x00, 0x00)
+         }
+        mid = self.num_pixels//2
+        lower = mid - (length//2)
+        upper = mid + (length//2)
+        self.strip.fill(lower, mid, 255, 255, 255, 50)
+        self.strip.fill(mid, upper, 255, 255, 255, 50)
+        for i in range(6):
+            pitch_strength = pitch_funcs[i](pos)
+            r, g, b = pitch_colors[i]
+            self.strip.fill(lower+(i*length//12), lower+((i+1)*length//12), r, g, b, pitch_strength)
+        for i in range(12, 6, -1):
+            pitch_strength = pitch_funcs[i](pos)
+            r, g, b = pitch_colors[i]
+            self.strip.fill(upper-((i+1)*length//12), upper-(i*length//12), r, g, b, pitch_strength)
+        self.strip.fill(0, lower, 0, 0, 0, 0)
+        self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
 
     @staticmethod
