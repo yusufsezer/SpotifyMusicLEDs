@@ -7,6 +7,7 @@ import spotipy
 import spotipy.util as util
 import threading
 import time
+import apa102
 
 
 class SpotifyVisualizer:
@@ -182,7 +183,7 @@ class SpotifyVisualizer:
         self.buffer_lock.release()
         return to_return
 
-    def _load_track_data(self, chunk_length=30):
+    def _load_track_data(self, chunk_length=12):
         """Obtain track data from the Spotify API and run necessary analysis to generate data needed for visualization.
 
         Each call to this function analyzes the next chunk_length seconds of track data and produces the appropriate
@@ -219,7 +220,7 @@ class SpotifyVisualizer:
         # Perform data interpolation
         start_times = np.array(s_t)
         loudnesses = np.array(l)
-        interpolated_loudness_func = interp1d(start_times, loudnesses, assume_sorted=True)
+        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
         interpolated_pitch_funcs, interpolated_timbre_funcs = [], []
         for i in range(12):
             # Create a separate interpolated pitch function for each of the 12 elements of the pitch vectors
@@ -286,10 +287,13 @@ class SpotifyVisualizer:
         loudness = loudness_func(pos)
         print("%f: %f" % (pos, loudness))
         length = int(self.num_pixels * SpotifyVisualizer._normalize_loudness(loudness))
-        mid = self.num_pixels/2
-        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
-        self.strip.fill(mid - (length/2), mid - 1, 0, 245, 0, 100)
-        self.strip.fill(mid, mid + (length/2), 0, 245, 0, 100)
+        mid = 119
+        #self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
+        self.strip.fill(mid - (length//2), mid, 0, 240, 0, 100)
+        #self.strip.fill(mid - (length//2), mid, 0, 240, 0, 100)
+        self.strip.fill(mid, mid + (length//2), 0, 240, 0, 100)
+        self.strip.fill(1, mid-(length//2), 0, 0, 0, 0)
+        self.strip.fill(mid+(length//2), self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
 
     @staticmethod
