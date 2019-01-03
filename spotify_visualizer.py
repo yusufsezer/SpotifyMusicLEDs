@@ -262,6 +262,9 @@ class SpotifyVisualizer:
     def _normalize_loudness(loudness, range_max=-4.0, range_min=-54.0):
         """Normalize a loudness value to the range specified.
 
+        Note that the range provided is normalized using a non-linearity function; this tends to provide a more
+        appealing visualization.
+
         Args:
             loudness (float): the loudness value to normalize.
             range_max (float): the upper bound of the range.
@@ -275,7 +278,22 @@ class SpotifyVisualizer:
         if loudness < range_min:
             range_min = loudness
         range_size = range_max - range_min
-        return (loudness - range_min) / range_size
+        linear_normalized = (loudness - range_min) / range_size
+        return SpotifyVisualizer._non_linearity_function(linear_normalized)
+
+    @staticmethod
+    def _non_linearity_function(value):
+        """A non-linearity function to apply to normalized pitch and loudness values
+
+        This non-linearity function helps create more appealing visualizations when applied to normalized pitch and
+        loudness values.
+
+        Args:
+            value (float): a normalized (between 0.0 and 1.0) pitch or loudness value.
+
+        :return: the value after applying non-linearity (float between 0.0 and 1.0).
+        """
+        return 1.4 + np.tanh((2*value) - 2.424)
 
     def _push_visual_to_strip(self, loudness_func, pitch_funcs, timbre_funcs, pos):
         """Displays a visual on LED strip based on the loudness, pitches and timbre at current playback position.
@@ -289,19 +307,33 @@ class SpotifyVisualizer:
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness)
         print("%f: %f" % (pos, loudness))
         length = int(self.num_pixels * norm_loudness)
+        # pitch_colors = {
+        #      0: (0xBF, 0x00, 0x5E),
+        #      1: (0xC2, 0x00, 0xC1),
+        #      2: (0x64, 0x00, 0xC5),
+        #      3: (0x10, 0x00, 0xC9),
+        #      4: (0x00, 0x65, 0xCC),
+        #      5: (0x00, 0xCF, 0xD0),
+        #      6: (0x00, 0xD3, 0x6A),
+        #      7: (0x00, 0xD7, 0x00),
+        #      8: (0x6C, 0xDA, 0x00),
+        #      9: (0xDD, 0xDE, 0x00),
+        #      10: (0xE1, 0x70, 0x00),
+        #      11: (0xE5, 0x00, 0x00)
+        # }
         pitch_colors = {
-             0: (0xBF, 0x00, 0x5E),
-             1: (0xC2, 0x00, 0xC1),
-             2: (0x64, 0x00, 0xC5),
-             3: (0x10, 0x00, 0xC9),
-             4: (0x00, 0x65, 0xCC),
-             5: (0x00, 0xCF, 0xD0),
-             6: (0x00, 0xD3, 0x6A),
-             7: (0x00, 0xD7, 0x00),
-             8: (0x6C, 0xDA, 0x00),
-             9: (0xDD, 0xDE, 0x00),
-             10: (0xE1, 0x70, 0x00),
-             11: (0xE5, 0x00, 0x00)
+            0: (0x00, 0xFF, 0x00),
+            1: (0x17, 0xE7, 0x00),
+            2: (0x2E, 0xD0, 0x00),
+            3: (0x45, 0x00, 0xB9),
+            4: (0x5C, 0xA2, 0x00),
+            5: (0x73, 0x8B, 0x00),
+            6: (0x8B, 0x73, 0x00),
+            7: (0xA2, 0x5C, 0x00),
+            8: (0xB9, 0x45, 0x00),
+            9: (0xD0, 0x2E, 0x00),
+            10: (0xE7, 0x17, 0x00),
+            11: (0xFF, 0x00, 0x00)
         }
         mid = self.num_pixels//2
         lower = mid - (length//2)
@@ -310,27 +342,20 @@ class SpotifyVisualizer:
         self.strip.fill(lower, mid, 240, 240, 240, 100)
         self.strip.fill(mid, upper, 240, 240, 240, 100)
         max_p = sorted([func(pos) for func in pitch_funcs])[-3:-1]
-        #print(max_p)
-        for i in range(6):
+        for i in range(12):
             pitch_val = pitch_funcs[i](pos)
             #if pitch_val not in max_p:
                 #continue
-            pitch_strength = (15+(pitch_val * 85)) * norm_loudness
-            r, g, b = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
-            start = lower+(i*length//12)
-            end = lower+((i+1)*length//12)
+            pitch_strength = SpotifyVisualizer._non_linearity_function(pitch_val)
+            r, b, g = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
+            if i in range(6):
+                start = lower+(i*length//12)
+                end = lower+((i+1)*length//12)
+            else:
+                start = upper - ((11 - i + 1) * length // 12)
+                end = upper - ((11 - i) * length // 12)
             #print("index {} r {} g {} b {} start {} end {} strength {}".format(i, r, g, b, start, end, pitch_strength))
-            self.strip.fill(start, end, r, g, b, pitch_strength)
-        for i in range(11, 5, -1):
-            pitch_val = pitch_funcs[i](pos)
-            #if pitch_val not in max_p:
-                #continue
-            pitch_strength = (15+(pitch_val * 85)) * norm_loudness
-            start = upper-((11-i+1)*length//12)
-            end = upper-((11-i)*length//12)
-            r, g, b = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
-            #print("index {} r {} g {} b {} start {} end {} strength {}".format(i, r, g, b, start, end, pitch_strength))
-            self.strip.fill(start, end, r, g, b, pitch_strength)
+            self.strip.fill(start, end, r, b, g, pitch_strength)
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
