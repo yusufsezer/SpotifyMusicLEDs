@@ -228,6 +228,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [pitch_list[i] if pitch_list[i] >= 0 else 0 for pitch_list in pitch_lists],
+                    kind="cubic",
                     assume_sorted=True
                 )
             )
@@ -285,8 +286,9 @@ class SpotifyVisualizer:
             timbre_funcs (list): A list of interpolated timbre functions (one timbre function for each basis function).
         """
         loudness = loudness_func(pos)
+        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness)
         print("%f: %f" % (pos, loudness))
-        length = int(self.num_pixels * SpotifyVisualizer._normalize_loudness(loudness))
+        length = int(self.num_pixels * norm_loudness)
         pitch_colors = {
              0: (0xBF, 0x00, 0x5E),
              1: (0xC2, 0x00, 0xC1),
@@ -300,20 +302,35 @@ class SpotifyVisualizer:
              9: (0xDD, 0xDE, 0x00),
              10: (0xE1, 0x70, 0x00),
              11: (0xE5, 0x00, 0x00)
-         }
+        }
         mid = self.num_pixels//2
         lower = mid - (length//2)
         upper = mid + (length//2)
-        self.strip.fill(lower, mid, 255, 255, 255, 50)
-        self.strip.fill(mid, upper, 255, 255, 255, 50)
+        #print("lower {} upper {} mid {}".format(lower, upper, mid))
+        self.strip.fill(lower, mid, 240, 240, 240, 100)
+        self.strip.fill(mid, upper, 240, 240, 240, 100)
+        max_p = sorted([func(pos) for func in pitch_funcs])[-3:-1]
+        #print(max_p)
         for i in range(6):
-            pitch_strength = pitch_funcs[i](pos)
-            r, g, b = pitch_colors[i]
-            self.strip.fill(lower+(i*length//12), lower+((i+1)*length//12), r, g, b, pitch_strength)
-        for i in range(12, 6, -1):
-            pitch_strength = pitch_funcs[i](pos)
-            r, g, b = pitch_colors[i]
-            self.strip.fill(upper-((i+1)*length//12), upper-(i*length//12), r, g, b, pitch_strength)
+            pitch_val = pitch_funcs[i](pos)
+            #if pitch_val not in max_p:
+                #continue
+            pitch_strength = (15+(pitch_val * 85)) * norm_loudness
+            r, g, b = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
+            start = lower+(i*length//12)
+            end = lower+((i+1)*length//12)
+            #print("index {} r {} g {} b {} start {} end {} strength {}".format(i, r, g, b, start, end, pitch_strength))
+            self.strip.fill(start, end, r, g, b, pitch_strength)
+        for i in range(11, 5, -1):
+            pitch_val = pitch_funcs[i](pos)
+            #if pitch_val not in max_p:
+                #continue
+            pitch_strength = (15+(pitch_val * 85)) * norm_loudness
+            start = upper-((11-i+1)*length//12)
+            end = upper-((11-i)*length//12)
+            r, g, b = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
+            #print("index {} r {} g {} b {} start {} end {} strength {}".format(i, r, g, b, start, end, pitch_strength))
+            self.strip.fill(start, end, r, g, b, pitch_strength)
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
@@ -382,7 +399,8 @@ class SpotifyVisualizer:
 
         if not self.sp_vis.current_playback()["is_playing"]:
             self.sp_vis.start_playback()
-
+        pos = self.playback_pos
+        self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, pos)
         # Visualize until end of track
         pos = self.playback_pos
         while pos <= self.track_duration:
