@@ -25,8 +25,10 @@ class SpotifyVisualizer:
         num_pixels (int): The number of pixels (LEDs) supported by the LED strip.
 
     Attributes:
+            blue_grad_func (interp1d): A function mapping pitch strengths (range 0->1) to blue values (range 0 -> 255)
             buffer_lock (Lock): A lock for the interpolated buffers.
             data_segments (list): Data segments to be parsed and interpreted (fetched from Spotify API).
+            green_grad_func (interp1d): A function mapping pitch strengths (range 0->1) to green values (range 0 -> 255)
             interpolated_loudness_buffer (list): Producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): Producer-consumer buffer holding lists of interpolated pitch functions.
             interpolated_timbre_buffer (list): Producer-consumer buffer holding lists of interpolated timbre functions.
@@ -34,6 +36,7 @@ class SpotifyVisualizer:
             permission_scopes (str): A space separated str of the required permission scopes over the user's account.
             playback_pos (float): The current playback position (offset into track in seconds) of the visualization.
             pos_lock (Lock): A lock for playback_pos.
+            red_grad_func (interp1d): A function mapping pitch strengths (range 0->1) to red values (range 0 -> 255)
             should_terminate (bool): A variable watched by all child threads (child threads exit if set to True).
             sp_gen (Spotify): Spotify object to handle main thread's interaction with the Spotify API.
             sp_load (Spotify): Spotify object to handle data loading thread's interaction with the Spotify API.
@@ -46,8 +49,10 @@ class SpotifyVisualizer:
     """
 
     def __init__(self, num_pixels):
+        self.blue_grad_func = interp1d([0, 1], [255, 0], kind="linear", assume_sorted=True)
         self.buffer_lock = threading.Lock()
         self.data_segments = []
+        self.green_grad_func = interp1d([0, 1], [0, 0], kind="linear", assume_sorted=True)
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
@@ -55,9 +60,10 @@ class SpotifyVisualizer:
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
+        self.red_grad_func = interp1d([0, 1], [0,255], kind="linear", assume_sorted=True)
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
-        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi = 10, sclk = 11, order='rbg')
+        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi = 10, sclk = 11, order='rgb')
         self.track = None
         self.track_duration = None
 
@@ -279,7 +285,8 @@ class SpotifyVisualizer:
             range_min = loudness
         range_size = range_max - range_min
         linear_normalized = (loudness - range_min) / range_size
-        return SpotifyVisualizer._non_linearity_function(linear_normalized)
+        # return SpotifyVisualizer._non_linearity_function(linear_normalized)
+        return linear_normalized
 
     @staticmethod
     def _non_linearity_function(value):
@@ -303,59 +310,30 @@ class SpotifyVisualizer:
             pitch_funcs (list): A list of interpolated pitch functions (one pitch function for each major musical key).
             timbre_funcs (list): A list of interpolated timbre functions (one timbre function for each basis function).
         """
-        loudness = loudness_func(pos)
-        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness)
-        print("%f: %f" % (pos, loudness))
-        length = int(self.num_pixels * norm_loudness)
-        # pitch_colors = {
-        #      0: (0xBF, 0x00, 0x5E),
-        #      1: (0xC2, 0x00, 0xC1),
-        #      2: (0x64, 0x00, 0xC5),
-        #      3: (0x10, 0x00, 0xC9),
-        #      4: (0x00, 0x65, 0xCC),
-        #      5: (0x00, 0xCF, 0xD0),
-        #      6: (0x00, 0xD3, 0x6A),
-        #      7: (0x00, 0xD7, 0x00),
-        #      8: (0x6C, 0xDA, 0x00),
-        #      9: (0xDD, 0xDE, 0x00),
-        #      10: (0xE1, 0x70, 0x00),
-        #      11: (0xE5, 0x00, 0x00)
-        # }
-        pitch_colors = {
-            0: (0x00, 0xFF, 0x00),
-            1: (0x17, 0xE7, 0x00),
-            2: (0x2E, 0xD0, 0x00),
-            3: (0x45, 0x00, 0xB9),
-            4: (0x5C, 0xA2, 0x00),
-            5: (0x73, 0x8B, 0x00),
-            6: (0x8B, 0x73, 0x00),
-            7: (0xA2, 0x5C, 0x00),
-            8: (0xB9, 0x45, 0x00),
-            9: (0xD0, 0x2E, 0x00),
-            10: (0xE7, 0x17, 0x00),
-            11: (0xFF, 0x00, 0x00)
-        }
+        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
+        print("%f: %f" % (pos, norm_loudness))
+        length = 240 # int(self.num_pixels * norm_loudness)
+
+        # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
         lower = mid - (length//2)
         upper = mid + (length//2)
-        #print("lower {} upper {} mid {}".format(lower, upper, mid))
-        self.strip.fill(lower, mid, 240, 240, 240, 100)
-        self.strip.fill(mid, upper, 240, 240, 240, 100)
-        max_p = sorted([func(pos) for func in pitch_funcs])[-3:-1]
+        self.strip.fill(lower, mid, 0, 0, 255, 100)
+        self.strip.fill(mid, upper, 0, 0, 255, 100)
+
+        # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(12):
             pitch_val = pitch_funcs[i](pos)
-            #if pitch_val not in max_p:
-                #continue
-            pitch_strength = SpotifyVisualizer._non_linearity_function(pitch_val)
-            r, b, g = pitch_colors[i]#(0, 255, 0) if i % 2 == 0 else (255, 0, 0)
+            r, g, b = self.red_grad_func(pitch_val), self.green_grad_func(pitch_val), self.blue_grad_func(pitch_val)
             if i in range(6):
                 start = lower+(i*length//12)
                 end = lower+((i+1)*length//12)
             else:
                 start = upper - ((11 - i + 1) * length // 12)
                 end = upper - ((11 - i) * length // 12)
-            #print("index {} r {} g {} b {} start {} end {} strength {}".format(i, r, g, b, start, end, pitch_strength))
-            self.strip.fill(start, end, r, b, g, pitch_strength)
+            self.strip.fill(start, end, r, g, b, 100)
+
+        # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
