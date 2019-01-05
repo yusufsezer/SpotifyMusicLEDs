@@ -322,20 +322,23 @@ class SpotifyVisualizer:
         bright = norm_loudness * 100
         lower = mid - round(length/2)
         upper = mid + round(length/2)
-        self.strip.fill(lower, mid, 0, 0, 255, bright)
-        self.strip.fill(mid, upper, 0, 0, 255, bright)
+        # self.strip.fill(lower, mid, 0, 0, 255, bright)
+        # self.strip.fill(mid, upper, 0, 0, 255, bright)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        for i in range(0, 12):
-            pitch_val = pitch_funcs[i](pos)
-            r, g, b = int(255.0*pitch_val), 0, int(255.0-(255.0*pitch_val))
-            if i in range(6):
-                start = lower+(i*length//12)
-                end = lower+((i+1)*length//12)
-            else:
-                start = upper - ((11 - i + 1) * length // 12)
-                end = upper - ((11 - i) * length // 12)
-            self.strip.fill(start, end, r, g, b, bright)
+        # for i in range(0, 12):
+        #     pitch_val = pitch_funcs[i](pos)
+        #     r, g, b = int(255.0*pitch_val), 0, int(255.0-(255.0*pitch_val))
+        #     if i in range(6):
+        #         start = lower+(i*length//12)
+        #         end = lower+((i+1)*length//12)
+        #     else:
+        #         start = upper - ((11 - i + 1) * length // 12)
+        #         end = upper - ((11 - i) * length // 12)
+        #     self.strip.fill(start, end, r, g, b, bright)
+        avg_pitch = np.mean(np.array([func(pos) for func in pitch_funcs]))
+        r, g, b = int(255.0 * avg_pitch), 0, int(255.0-(255.0*avg_pitch))
+        self.strip.fill(lower, upper, r, g, b, bright)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
