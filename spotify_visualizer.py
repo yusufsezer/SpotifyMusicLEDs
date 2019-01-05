@@ -319,10 +319,11 @@ class SpotifyVisualizer:
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
+        bright = norm_loudness * 100
         lower = mid - round(length/2)
         upper = mid + round(length/2)
-        self.strip.fill(lower, mid, 0, 0, 255, 100)
-        self.strip.fill(mid, upper, 0, 0, 255, 100)
+        self.strip.fill(lower, mid, 0, 0, 255, bright)
+        self.strip.fill(mid, upper, 0, 0, 255, bright)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
@@ -334,7 +335,7 @@ class SpotifyVisualizer:
             else:
                 start = upper - ((11 - i + 1) * length // 12)
                 end = upper - ((11 - i) * length // 12)
-            self.strip.fill(start, end, r, g, b, 100)
+            self.strip.fill(start, end, r, g, b, bright)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
