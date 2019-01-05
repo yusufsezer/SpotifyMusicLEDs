@@ -62,7 +62,7 @@ class SpotifyVisualizer:
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
-        self.red_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 0.0]), kind="linear", assume_sorted=True)
+        self.red_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 255.0]), kind="linear", assume_sorted=True)
         # self.red_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.01]), np.array([0.0, 0.0, 0.0, 0.0]), kind="cubic", assume_sorted=True)
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
@@ -315,7 +315,7 @@ class SpotifyVisualizer:
         """
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
-        length = 240 # int(self.num_pixels * norm_loudness)
+        length = int(self.num_pixels * norm_loudness)
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
