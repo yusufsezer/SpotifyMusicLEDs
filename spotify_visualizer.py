@@ -49,10 +49,10 @@ class SpotifyVisualizer:
     """
 
     def __init__(self, num_pixels):
-        self.blue_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([255.0, 200.0, 120.0, 0.0]), kind="cubic", assume_sorted=True)
+        self.blue_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([0.0, 0.0, 0.0, 0.0]), kind="cubic", assume_sorted=True)
         self.buffer_lock = threading.Lock()
         self.data_segments = []
-        self.green_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([0.0, 0.0,  0.0, 0.0]), kind="cubic", assume_sorted=True)
+        self.green_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([255.0, 200.0, 120.0, 0.0]), kind="cubic", assume_sorted=True)
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
