@@ -288,8 +288,8 @@ class SpotifyVisualizer:
             range_min = loudness
         range_size = range_max - range_min
         linear_normalized = (loudness - range_min) / range_size
-        # return SpotifyVisualizer._non_linearity_function(linear_normalized)
-        return linear_normalized
+        return SpotifyVisualizer._non_linearity_function(linear_normalized)
+        #return linear_normalized
 
     @staticmethod
     def _non_linearity_function(value):
@@ -319,13 +319,13 @@ class SpotifyVisualizer:
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
-        lower = mid - (length//2)
-        upper = mid + (length//2)
+        lower = mid - round(length/2)
+        upper = mid + round(length/2)
         self.strip.fill(lower, mid, 0, 0, 255, 100)
         self.strip.fill(mid, upper, 0, 0, 255, 100)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        for i in range(12):
+        for i in range(8, 12):
             pitch_val = SpotifyVisualizer._non_linearity_function(pitch_funcs[i](pos))# pitch_funcs[i](pos)
             r, g, b = int(self.red_grad_func(pitch_val)), int(self.green_grad_func(pitch_val)), int(self.blue_grad_func(pitch_val))
             if i in range(6):
