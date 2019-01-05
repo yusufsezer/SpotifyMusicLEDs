@@ -336,8 +336,9 @@ class SpotifyVisualizer:
         #         start = upper - ((11 - i + 1) * length // 12)
         #         end = upper - ((11 - i) * length // 12)
         #     self.strip.fill(start, end, r, g, b, bright)
-        avg_pitch = np.mean(np.array([func(pos) for func in pitch_funcs]))
-        r, g, b = int(255.0 * avg_pitch), 0, int(255.0-(255.0*avg_pitch))
+        avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
+        avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
+        r, g, b = int(255.0 * avg_high), 0, int(255.0 * avg_low)
         self.strip.fill(lower, upper, r, g, b, bright)
 
         # Make sure to clear ends of the strip that are not in use and update strip
