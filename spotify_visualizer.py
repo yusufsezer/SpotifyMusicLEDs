@@ -325,16 +325,16 @@ class SpotifyVisualizer:
         self.strip.fill(mid, upper, 0, 0, 255, 100)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        for i in range(8, 12):
-            pitch_val = SpotifyVisualizer._non_linearity_function(pitch_funcs[i](pos))# pitch_funcs[i](pos)
-            r, g, b = int(self.red_grad_func(pitch_val)), int(self.green_grad_func(pitch_val)), int(self.blue_grad_func(pitch_val))
-            if i in range(6):
-                start = lower+(i*length//12)
-                end = lower+((i+1)*length//12)
-            else:
-                start = upper - ((11 - i + 1) * length // 12)
-                end = upper - ((11 - i) * length // 12)
-            self.strip.fill(start, end, r, g, b, 100)
+        # for i in range(8, 12):
+        #     pitch_val = SpotifyVisualizer._non_linearity_function(pitch_funcs[i](pos))# pitch_funcs[i](pos)
+        #     r, g, b = int(self.red_grad_func(pitch_val)), int(self.green_grad_func(pitch_val)), int(self.blue_grad_func(pitch_val))
+        #     if i in range(6):
+        #         start = lower+(i*length//12)
+        #         end = lower+((i+1)*length//12)
+        #     else:
+        #         start = upper - ((11 - i + 1) * length // 12)
+        #         end = upper - ((11 - i) * length // 12)
+        #     self.strip.fill(start, end, r, g, b, 100)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
