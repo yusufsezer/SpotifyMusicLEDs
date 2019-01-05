@@ -325,7 +325,7 @@ class SpotifyVisualizer:
         self.strip.fill(mid, upper, 0, 0, 255, 100)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        for i in range(12):
+        for i in range(0, 12, 2):
             pitch_val = pitch_funcs[i](pos)
             r, g, b = int(255.0*pitch_val), int(self.green_grad_func(pitch_val)), int(255.0-(255.0*pitch_val))
             if i in range(6):
