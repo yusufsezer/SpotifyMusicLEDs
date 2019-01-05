@@ -49,10 +49,10 @@ class SpotifyVisualizer:
     """
 
     def __init__(self, num_pixels):
-        self.blue_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([0.0, 0.0, 0.0, 0.0]), kind="cubic", assume_sorted=True)
+        self.blue_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.01]), np.array([0.0, 0.0, 0.0, 0.0]), kind="cubic", assume_sorted=True)
         self.buffer_lock = threading.Lock()
         self.data_segments = []
-        self.green_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([255.0, 200.0, 120.0, 0.0]), kind="cubic", assume_sorted=True)
+        self.green_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.01]), np.array([255.0, 200.0, 120.0, 0.0]), kind="cubic", assume_sorted=True)
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
@@ -60,7 +60,7 @@ class SpotifyVisualizer:
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
-        self.red_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.0]), np.array([0.0, 120.0, 200.0, 255.0]), kind="cubic", assume_sorted=True)
+        self.red_grad_func = interp1d(np.array([0.0, 1/3, 2/3, 1.01]), np.array([0.0, 120.0, 200.0, 255.0]), kind="cubic", assume_sorted=True)
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi = 10, sclk = 11, order='rgb')
