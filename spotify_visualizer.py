@@ -288,8 +288,8 @@ class SpotifyVisualizer:
             range_min = loudness
         range_size = range_max - range_min
         linear_normalized = (loudness - range_min) / range_size
-        return SpotifyVisualizer._non_linearity_function(linear_normalized)
-        #return linear_normalized
+        # return SpotifyVisualizer._non_linearity_function(linear_normalized)
+        return linear_normalized
 
     @staticmethod
     def _non_linearity_function(value):
