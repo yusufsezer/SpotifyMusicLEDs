@@ -322,12 +322,15 @@ class SpotifyVisualizer:
         brightness = norm_loudness * 100
         lower = mid - round(length/2)
         upper = mid + round(length/2)
-        self.strip.fill(lower, mid, 0, 0, 255, brightness)
-        self.strip.fill(mid, upper, 0, 0, 255, brightness)
+        #self.strip.fill(lower, mid, 0, 0, 255, brightness)
+        #self.strip.fill(mid, upper, 0, 0, 255, brightness)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
             pitch_val = pitch_funcs[i](pos)
+            if pitch_val < 0:
+                print('__________________***********************{}***********************__________________'.format(pitch_val))
+                raise Exception()
             r, g, b = int(255.0 * pitch_val), 0, int(255.0 - (255.0 * pitch_val))
             if i in range(6):
                 start = lower+(i*length//12)
@@ -341,9 +344,10 @@ class SpotifyVisualizer:
             # Reduce the strength of the rgb values near the ends of the zone to produce a fade gradient effect
             for j in range(start, end + 1):
                 ratio = (j - start) / (segment_mid - start) if segment_mid != start else 1.0
-                ratio = ratio if ratio <= 1.0 else ratio - 1.0
+                ratio = ratio if ratio <= 1.0 else 2.0 - 1.0
                 scaled_r, scaled_g, scaled_b = int(r * ratio), int(g * ratio), int(b * ratio)
-                self.strip.fill(i, i, scaled_r, scaled_g, scaled_g, brightness)
+                print(start, end, j, scaled_r, scaled_g, scaled_b, '|', r, g, b)
+                self.strip.set_pixel(j, scaled_r, scaled_g, scaled_b, brightness)
 
         # avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
         # avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
