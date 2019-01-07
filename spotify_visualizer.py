@@ -315,7 +315,7 @@ class SpotifyVisualizer:
         """
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
-        length = 240#int(self.num_pixels * norm_loudness)
+        length = 240# int(self.num_pixels * norm_loudness)
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
@@ -331,7 +331,7 @@ class SpotifyVisualizer:
             if pitch_val < 0:
                 print('__________________***********************{}***********************__________________'.format(pitch_val))
                 raise Exception()
-            r, g, b = int(255.0 * pitch_val), 0, int(255.0 - (255.0 * pitch_val))
+            r, g, b = 0, int(255.0 * pitch_val), int(255.0 - (255.0 * pitch_val))
             if i in range(6):
                 start = lower+(i*length//12)
                 end = lower+((i+1)*length//12)
