@@ -229,7 +229,7 @@ class SpotifyVisualizer:
         # Perform data interpolation
         start_times = np.array(s_t)
         loudnesses = np.array(l)
-        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
+        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='linear', assume_sorted=True)
         interpolated_pitch_funcs, interpolated_timbre_funcs = [], []
         for i in range(12):
             # Create a separate interpolated pitch function for each of the 12 elements of the pitch vectors
@@ -237,7 +237,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [pitch_list[i] if pitch_list[i] >= 0 else 0 for pitch_list in pitch_lists],
-                    kind="cubic",
+                    kind="linear",
                     assume_sorted=True
                 )
             )
