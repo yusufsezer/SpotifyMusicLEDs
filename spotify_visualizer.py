@@ -315,11 +315,11 @@ class SpotifyVisualizer:
         """
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
-        length = int(self.num_pixels * norm_loudness)
+        length = 240#int(self.num_pixels * norm_loudness)
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
-        brightness = norm_loudness * 100
+        brightness = 100#norm_loudness * 100
         lower = mid - round(length/2)
         upper = mid + round(length/2)
         #self.strip.fill(lower, mid, 0, 0, 255, brightness)
@@ -342,12 +342,18 @@ class SpotifyVisualizer:
             segment_mid = start + (segment_len // 2)
 
             # Reduce the strength of the rgb values near the ends of the zone to produce a fade gradient effect
-            for j in range(start, end + 1):
+            for j in range(start, segment_mid):
                 ratio = (j - start) / (segment_mid - start) if segment_mid != start else 1.0
-                ratio = ratio if ratio <= 1.0 else 2.0 - 1.0
-                scaled_r, scaled_g, scaled_b = int(r * ratio), int(g * ratio), int(b * ratio)
-                print(start, end, j, scaled_r, scaled_g, scaled_b, '|', r, g, b)
+                ratio = SpotifyVisualizer._non_linearity_function(ratio)
+                scaled_r, scaled_g, scaled_b = int(r * ratio), int(g * ratio), int(255.0 - int(255.0 * pitch_val * ratio))
                 self.strip.set_pixel(j, scaled_r, scaled_g, scaled_b, brightness)
+            self.strip.set_pixel(segment_mid, r, g, b, brightness)
+            for j in range(segment_mid+1, end + 1):
+                ratio = 1.0 - ((j - segment_mid + 1) / (end - segment_mid)) if segment_mid != end else 1.0
+                ratio = SpotifyVisualizer._non_linearity_function(ratio)
+                scaled_r, scaled_g, scaled_b = int(r * ratio), int(g * ratio), int(255.0 - int(255.0 * pitch_val * ratio))
+                self.strip.set_pixel(j, scaled_r, scaled_g, scaled_b, brightness)
+            
 
         # avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
         # avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
@@ -485,3 +491,4 @@ if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and start visualization
     visualizer = SpotifyVisualizer(240)
     visualizer.visualize()
+r
