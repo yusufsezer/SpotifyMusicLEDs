@@ -343,7 +343,7 @@ class SpotifyVisualizer:
                 ratio = (j - start) / (segment_mid - start) if segment_mid != start else 1.0
                 ratio = ratio if ratio <= 1.0 else ratio - 1.0
                 scaled_r, scaled_g, scaled_b = r * ratio, g * ratio, b * ratio
-                self.strip.set_pixel(i, scaled_r, scaled_g, scaled_g, brightness)
+                self.strip.fill(i, i, scaled_r, scaled_g, scaled_g, brightness)
 
         # avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
         # avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
