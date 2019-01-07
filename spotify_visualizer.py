@@ -319,27 +319,36 @@ class SpotifyVisualizer:
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels//2
-        bright = norm_loudness * 100
+        brightness = norm_loudness * 100
         lower = mid - round(length/2)
         upper = mid + round(length/2)
-        # self.strip.fill(lower, mid, 0, 0, 255, bright)
-        # self.strip.fill(mid, upper, 0, 0, 255, bright)
+        self.strip.fill(lower, mid, 0, 0, 255, brightness)
+        self.strip.fill(mid, upper, 0, 0, 255, brightness)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        # for i in range(0, 12):
-        #     pitch_val = pitch_funcs[i](pos)
-        #     r, g, b = int(255.0*pitch_val), 0, int(255.0-(255.0*pitch_val))
-        #     if i in range(6):
-        #         start = lower+(i*length//12)
-        #         end = lower+((i+1)*length//12)
-        #     else:
-        #         start = upper - ((11 - i + 1) * length // 12)
-        #         end = upper - ((11 - i) * length // 12)
-        #     self.strip.fill(start, end, r, g, b, bright)
-        avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
-        avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
-        r, g, b = int(255.0 * avg_high), 0, int(255.0 * avg_low)
-        self.strip.fill(lower, upper, r, g, b, bright)
+        for i in range(0, 12):
+            pitch_val = pitch_funcs[i](pos)
+            r, g, b = int(255.0 * pitch_val), 0, int(255.0 - (255.0 * pitch_val))
+            if i in range(6):
+                start = lower+(i*length//12)
+                end = lower+((i+1)*length//12)
+            else:
+                start = upper - ((11 - i + 1) * length // 12)
+                end = upper - ((11 - i) * length // 12)
+            segment_len = end - start
+            segment_mid = start + (segment_len // 2)
+
+            # Reduce the strength of the rgb values near the ends of the zone to produce a fade gradient effect
+            for j in range(start, end + 1):
+                ratio = (j - start) / (segment_mid - start)
+                ratio = ratio if ratio <= 1.0 else ratio - 1.0
+                scaled_r, scaled_g, scaled_b = r * ratio, g * ratio, b * ratio
+                self.strip.set_pixel(i, scaled_r, scaled_g, scaled_g, brightness)
+
+        # avg_low = np.mean(np.array([pitch_funcs[i](pos) for i in range(6)]))
+        # avg_high = np.mean(np.array([pitch_funcs[i](pos) for i in range(6, 12)]))
+        # r, g, b = int(255.0 * avg_high), 0, int(255.0 * avg_low)
+        # self.strip.fill(lower, upper, r, g, b, brightness)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
