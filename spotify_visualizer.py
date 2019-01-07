@@ -340,7 +340,7 @@ class SpotifyVisualizer:
 
             # Reduce the strength of the rgb values near the ends of the zone to produce a fade gradient effect
             for j in range(start, end + 1):
-                ratio = (j - start) / (segment_mid - start)
+                ratio = (j - start) / (segment_mid - start) if segment_mid != start else 1.0
                 ratio = ratio if ratio <= 1.0 else ratio - 1.0
                 scaled_r, scaled_g, scaled_b = r * ratio, g * ratio, b * ratio
                 self.strip.set_pixel(i, scaled_r, scaled_g, scaled_g, brightness)
