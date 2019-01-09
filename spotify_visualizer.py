@@ -462,7 +462,6 @@ class SpotifyVisualizer:
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
         brightness = 100
-        self.strip.fill(lower, upper, 0, 0, 255, brightness)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
@@ -475,6 +474,10 @@ class SpotifyVisualizer:
                 end = upper - ((11 - i) * length // 12)
             segment_len = end - start
             segment_mid = start + (segment_len // 2)
+
+            # Set middle pixel to always be green (if odd number of pixels, segments don't cover middle pixel)
+            start_r, start_g, start_b = self.start_color
+            self.strip.set_pixel(mid, start_r, start_g, start_b, brightness)
 
             # Get the appropriate RGB color based on the current pitch zone and pitch strength
             r, g, b = self._calculate_zone_color(pitch_strength, i)
