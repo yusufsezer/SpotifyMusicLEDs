@@ -281,7 +281,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [pitch_list[i] if pitch_list[i] >= 0 else 0 for pitch_list in pitch_lists],
-                    kind="quadratic",
+                    kind="linear",
                     assume_sorted=True
                 )
             )
