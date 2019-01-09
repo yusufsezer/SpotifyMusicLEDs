@@ -381,14 +381,14 @@ class SpotifyVisualizer:
 
             # Reduce the strength of the RGB values near the ends of the zone to produce a fade gradient effect
             for j in range(start, segment_mid):
-                slider = (1.0 + (j - start)) / (1 + (segment_mid - start)) if segment_mid != start else 1.0
+                slider = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
                 nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
                 nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
                 self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
             nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val, i)
             self.strip.set_pixel(segment_mid, nl_r, nl_g, nl_b, brightness)
             for j in range(segment_mid+1, end + 1):
-                slider = 1.0 - ((j - (segment_mid + 2.0)) / (1.0 + (end - segment_mid))) if segment_mid != end else 1.0
+                slider = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
                 nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
                 nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
                 self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
