@@ -124,24 +124,86 @@ class SpotifyVisualizer:
         self.playback_pos = track_progress
         self.pos_lock.release()
 
-    def _calculate_gradient_color(self, slider, pitch_strength, zone_index):
+    def visualize(self):
+        """Coordinate visualization by spawning the appropriate threads.
+
+        There are 4 threads: one for visualization, one for periodically syncing the playback position with the Spotify
+        API, one for loading chunks of track data, and one to periodically check if the user's current track has
+        changed.
+        """
+        self.authorize()
+        while True:
+            self._reset()
+            self.get_track()
+
+            # Start threads and wait for them to exit
+            threads = [
+                threading.Thread(target=self._visualize),
+                threading.Thread(target=self._continue_loading_data),
+                threading.Thread(target=self._continue_syncing),
+                threading.Thread(target=self._continue_checking_if_skip)
+            ]
+            for thread in threads:
+                thread.start()
+            text = "Started visualization."
+            print(SpotifyVisualizer._make_text_effect(text, ["green"]))
+            for thread in threads:
+                thread.join()
+            text = "Visualization finished."
+            print(SpotifyVisualizer._make_text_effect(text, ["green"]))
+
+    def _apply_gradient_fade(self, r, g, b, strength):
+        """Fade the passed RGB value towards the gradient start color based on strength
+
+        Note that a strength value of 0.0 results in the start color of the gradient, and a strength value of 1.0
+        results in the same RGB color that was passed (no fade is applied)
+
+        Args:
+             r (int): represents the red value (in range [0, 255]) of the RGB color to fade
+             b (int): represents the blue value (in range [0, 255]) of the RGB color to fade
+             g (int): represents the green value (in range [0, 255]) of the RGB color to fade
+             strength (float): a strength value representing how strong the RGB color should be (in range [0.0, 1.0])
+
+        Returns:
+            a 3-tuple of ints representing the RGB value with fade applied
+        """
+        start_r, start_g, start_b = self.start_color
+        r_diff, g_diff, b_diff = r - start_r, g - start_g, b - start_b
+
+        faded_r = start_r + int(strength * r_diff)
+        faded_g = start_g + int(strength * g_diff)
+        faded_b = start_b + int(strength * b_diff)
+
+        return faded_r, faded_g, faded_b
+
+    def _calculate_zone_color(self, pitch_strength, zone_index):
+        """Calculate the color to visualize based on the pitch/zone index and corresponding pitch strenghth.
+
+        The visualizer divides the lit portion of the strip into 12 equal-length zones, one for each of the 12 major
+        pitch keys. This function calculates what color should be displayed in the zone specified by zone_index if the
+        corresponding pitch has strength pitch_strength (0.0 corresponds to lowest strength, 1.0 corresponds to maximum
+        strength)
+
+        Args:
+            pitch_strength (float): a value representing how strong or present a pitch is (normalized to [0.0, 1.0])
+            zone_index (int): an index in range(12) corresponding to the pitch-key/zone
+
+        Returns:
+            a 3-tuple of ints representing an RGB value
+        """
         if pitch_strength < 0.0:
             pitch_strength = 0.0
         elif pitch_strength > 1.0:
             pitch_strength = 1.0
-        start_r, start_g, start_b = self.start_color
 
+        start_r, start_g, start_b = self.start_color
         end_r, end_g, end_b = self.end_colors[zone_index]
         r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
-        curr_r = int(start_r + (pitch_strength * r_diff))
-        curr_g = int(start_g + (pitch_strength * g_diff))
-        curr_b = int(start_b + (pitch_strength * b_diff))
-        
-        r_diff, g_diff, b_diff = curr_r - start_r, curr_g - start_g, curr_b - start_b
-        r = int(start_r + (slider * r_diff))
-        g = int(start_g + (slider * g_diff))
-        b = int(start_b + (slider * b_diff))
-        
+
+        r = start_r + int(pitch_strength * r_diff)
+        g = start_g + int(pitch_strength * g_diff)
+        b = start_b + int(pitch_strength * b_diff)
+
         return r, g, b
 
     def _continue_checking_if_skip(self, wait=0.33):
@@ -233,6 +295,9 @@ class SpotifyVisualizer:
         Args:
             strength_value (float): a normalized (between 0.0 and 1.0) value representing the strength of a color. Used
                                     for calculating color gradients in pitch zones.
+
+        Returns:
+            strength_value after application of the non-linearity function (float in range [0.0, 1.0])
         """
         return (1.0 - (strength_value - 1.0) ** 2) ** 0.5
 
@@ -246,7 +311,7 @@ class SpotifyVisualizer:
         Args:
             chunk_length (float): the number of seconds of track data to analyze.
         """
-        # Get track audio data for current song from Spotipy API if necessary
+        # Get track audio data for current song from Spotify API if necessary
         if not self.data_segments:
             analysis = self.sp_load.audio_analysis(self.track["item"]["id"])
             self.data_segments.append({"start": -0.1, "loudness_start": -25.0, "pitches": 12*[0], "timbre": 12*[0]})
@@ -324,20 +389,49 @@ class SpotifyVisualizer:
         Args:
             strength_value (float): a normalized (between 0.0 and 1.0) strength value representing loudness. Used when
             calculating how many LED pixels to activate.
+
+        Returns:
+            strength_value after application of the non-linearity function (float in range [0.0, 1.0])
         """
         return 1.0 + np.tanh(strength_value - 1)
 
     @staticmethod
-    def _normalize_loudness(loudness, range_max=-4.0, range_min=-54.0):
-        """Normalize a loudness value to the range specified.
+    def _make_text_effect(text, text_effects):
+        """"Applies text effects to text and returns it.
 
-        Note that the range provided is normalized using a non-linearity function; this tends to provide a more
-        appealing visualization.
+        Supported text effects:
+            "green", "red", "blue", "bold"
+
+        Args:
+            text (str): The text to apply effects to.
+            text_effects (list): A list of str, each str representing an effect to apply to the text.
+
+        Returns:
+            Text (str) with effects applied.
+        """
+        effects = {
+            "green": "\033[92m",
+            "red": "\033[91m",
+            "blue": "\033[94m",
+            "bold": "\033[1m"
+        }
+        end_code = "\033[0m"
+        msg_with_fx = ""
+        for effect in text_effects:
+            msg_with_fx += effects[effect]
+        msg_with_fx += text
+        for _ in range(len(text_effects)):
+            msg_with_fx += end_code
+        return msg_with_fx
+
+    @staticmethod
+    def _normalize_loudness(loudness, range_min=-54.0, range_max=-4.0):
+        """Normalize a loudness value to the range specified.
 
         Args:
             loudness (float): the loudness value to normalize.
-            range_max (float): the upper bound of the range.
             range_min (float): the lower bound of the range.
+            range_max (float): the upper bound of the range.
 
         Returns:
             The normalized loudness value (float between 0.0 and 1.0) for the specified range.
@@ -371,61 +465,36 @@ class SpotifyVisualizer:
         self.strip.fill(lower, upper, 0, 0, 255, brightness)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        # for i in range(0, 12):
-        #     pitch_val = pitch_funcs[i](pos)
-        #     if i in range(6):
-        #         start = lower + (i * length // 12)
-        #         end = lower + ((i + 1) * length // 12)
-        #     else:
-        #         start = upper - ((11 - i + 1) * length // 12)
-        #         end = upper - ((11 - i) * length // 12)
-        #     segment_len = end - start
-        #     segment_mid = start + (segment_len // 2)
-        #
-        #     # Reduce the strength of the RGB values near the ends of the zone to produce a fade gradient effect
-        #     for j in range(start, segment_mid):
-        #         slider = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
-        #         nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-        #         nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
-        #         self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
-        #     nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val, i)
-        #     self.strip.set_pixel(segment_mid, nl_r, nl_g, nl_b, brightness)
-        #     for j in range(segment_mid+1, end + 1):
-        #         slider = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
-        #         nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-        #         nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
-        #         self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
+        for i in range(0, 12):
+            pitch_strength = pitch_funcs[i](pos)
+            if i in range(6):
+                start = lower + (i * length // 12)
+                end = lower + ((i + 1) * length // 12)
+            else:
+                start = upper - ((11 - i + 1) * length // 12)
+                end = upper - ((11 - i) * length // 12)
+            segment_len = end - start
+            segment_mid = start + (segment_len // 2)
+
+            # Get the appropriate RGB color based on the current pitch zone and pitch strength
+            r, g, b = self._calculate_zone_color(pitch_strength, i)
+
+            # Fade the strength of the RGB values near the ends of the zone to produce a nice gradient effect
+            for j in range(start, segment_mid):
+                color_strength = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
+                faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
+                self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
+            faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, 1.0)
+            self.strip.set_pixel(segment_mid, faded_r, faded_g, faded_b, brightness)
+            for j in range(segment_mid+1, end + 1):
+                color_strength = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
+                faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
+                self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
-        self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
+        self.strip.fill(upper, self.num_pixels - 1, 0, 0, 0, 0)
         self.strip.show()
-
-    @staticmethod
-    def _make_text_effect(text, text_effects):
-        """"Applies text effects to text and returns it.
-
-        Args:
-            text (str): The text to apply effects to.
-            text_effects (list): A list of str, each str representing an effect to apply to the text.
-
-        Returns:
-            Text (str) with effects applied.
-        """
-        effects = {
-            "green": "\033[92m",
-            "red": "\033[91m",
-            "blue": "\033[94m",
-            "bold": "\033[1m"
-        }
-        end_code = "\033[0m"
-        msg_with_fx = ""
-        for effect in text_effects:
-            msg_with_fx += effects[effect]
-        msg_with_fx += text
-        for _ in range(len(text_effects)):
-            msg_with_fx += end_code
-        return msg_with_fx
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
@@ -494,34 +563,6 @@ class SpotifyVisualizer:
             # Account for time used to create visualization
             diff = sample_rate - (end - start)
             time.sleep(diff if diff > 0 else 0)
-
-    def visualize(self):
-        """Coordinate visualization by spawning the appropriate threads.
-
-        There are 4 threads: one for visualization, one for periodically syncing the playback position with the Spotify
-        API, one for loading chunks of track data, and one to periodically check if the user's current track has
-        changed.
-        """
-        self.authorize()
-        while True:
-            self._reset()
-            self.get_track()
-
-            # Start threads and wait for them to exit
-            threads = [
-                threading.Thread(target=self._visualize),
-                threading.Thread(target=self._continue_loading_data),
-                threading.Thread(target=self._continue_syncing),
-                threading.Thread(target=self._continue_checking_if_skip)
-            ]
-            for thread in threads:
-                thread.start()
-            text = "Started visualization."
-            print(SpotifyVisualizer._make_text_effect(text, ["green"]))
-            for thread in threads:
-                thread.join()
-            text = "Visualization finished."
-            print(SpotifyVisualizer._make_text_effect(text, ["green"]))
 
 
 if __name__ == "__main__":
