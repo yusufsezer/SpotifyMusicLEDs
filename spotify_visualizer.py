@@ -480,16 +480,18 @@ class SpotifyVisualizer:
             r, g, b = self._calculate_zone_color(pitch_strength, i)
 
             # Fade the strength of the RGB values near the ends of the zone to produce a nice gradient effect
-            for j in range(start, segment_mid):
-                color_strength = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
+            for j in range(start, end + 1):
+                color_strength = (1.0 + (j - start)) / (1.0 + (segment_mid - start))
+                if color_strength > 1.0:
+                    color_strength = 2.0 - color_strength
                 faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
                 self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
-            faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, 1.0)
-            self.strip.set_pixel(segment_mid, faded_r, faded_g, faded_b, brightness)
-            for j in range(segment_mid+1, end + 1):
-                color_strength = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
-                faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
-                self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
+            # faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, 1.0)
+            # self.strip.set_pixel(segment_mid, faded_r, faded_g, faded_b, brightness)
+            # for j in range(segment_mid+1, end + 1):
+            #     color_strength = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
+            #     faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
+            #     self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
