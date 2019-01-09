@@ -489,7 +489,7 @@ class SpotifyVisualizer:
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
-        self.strip.fill(upper, self.num_pixels - 1, 0, 0, 0, 0)
+        self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
 
     def _reset(self):
