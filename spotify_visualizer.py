@@ -130,7 +130,7 @@ class SpotifyVisualizer:
         elif pitch_strength > 1.0:
             pitch_strength = 1.0
         start_r, start_g, start_b = self.start_color
-        
+
         end_r, end_g, end_b = self.end_colors[zone_index]
         r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
         curr_r = int(start_r + (pitch_strength * r_diff))
@@ -281,7 +281,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [pitch_list[i] if pitch_list[i] >= 0 else 0 for pitch_list in pitch_lists],
-                    kind="linear",
+                    kind="quadratic",
                     assume_sorted=True
                 )
             )
