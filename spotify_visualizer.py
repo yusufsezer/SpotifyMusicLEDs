@@ -368,32 +368,33 @@ class SpotifyVisualizer:
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
         brightness = 100
+        self.strip.fill(lower, upper, 0, 0, 255, brightness)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
-        for i in range(0, 12):
-            pitch_val = pitch_funcs[i](pos)
-            if i in range(6):
-                start = lower + (i * length // 12)
-                end = lower + ((i + 1) * length // 12)
-            else:
-                start = upper - ((11 - i + 1) * length // 12)
-                end = upper - ((11 - i) * length // 12)
-            segment_len = end - start
-            segment_mid = start + (segment_len // 2)
-
-            # Reduce the strength of the RGB values near the ends of the zone to produce a fade gradient effect
-            for j in range(start, segment_mid):
-                slider = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
-                nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
-                self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
-            nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val, i)
-            self.strip.set_pixel(segment_mid, nl_r, nl_g, nl_b, brightness)
-            for j in range(segment_mid+1, end + 1):
-                slider = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
-                nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
-                self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
+        # for i in range(0, 12):
+        #     pitch_val = pitch_funcs[i](pos)
+        #     if i in range(6):
+        #         start = lower + (i * length // 12)
+        #         end = lower + ((i + 1) * length // 12)
+        #     else:
+        #         start = upper - ((11 - i + 1) * length // 12)
+        #         end = upper - ((11 - i) * length // 12)
+        #     segment_len = end - start
+        #     segment_mid = start + (segment_len // 2)
+        #
+        #     # Reduce the strength of the RGB values near the ends of the zone to produce a fade gradient effect
+        #     for j in range(start, segment_mid):
+        #         slider = (1.0 + (j - start)) / (1.0 + (segment_mid - start)) if segment_mid != start else 1.0
+        #         nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
+        #         nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
+        #         self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
+        #     nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val, i)
+        #     self.strip.set_pixel(segment_mid, nl_r, nl_g, nl_b, brightness)
+        #     for j in range(segment_mid+1, end + 1):
+        #         slider = 1.0 - ((1.0 + (j - (segment_mid + 1.0))) / (1.0 + (end - (segment_mid + 1.0)))) if segment_mid != end else 1.0
+        #         nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
+        #         nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
+        #         self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
 
         # Make sure to clear ends of the strip that are not in use and update strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
