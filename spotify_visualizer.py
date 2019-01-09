@@ -27,7 +27,7 @@ class SpotifyVisualizer:
     Attributes:
             buffer_lock (Lock): A lock for the interpolated buffers.
             data_segments (list): Data segments to be parsed and interpreted (fetched from Spotify API).
-            end_color (tuple): a 3-tuple of ints for the RGB value representing the end color of the pitch gradient
+            end_colors (dict): a dict of 12 RGB tuples; each tuple represents the end-gradient-color for a pitch zone
             interpolated_loudness_buffer (list): Producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): Producer-consumer buffer holding lists of interpolated pitch functions.
             interpolated_timbre_buffer (list): Producer-consumer buffer holding lists of interpolated timbre functions.
@@ -51,7 +51,20 @@ class SpotifyVisualizer:
         self.blue_grad_func = interp1d(np.array([0.0, 1.01]), np.array([255.0, 0.0]), kind="linear", assume_sorted=True)
         self.buffer_lock = threading.Lock()
         self.data_segments = []
-        self.end_color = (255, 255, 255)
+        self.end_colors = {
+            0: (0, 0, 0xFF),
+            1: (0x17, 0, 0xE7),
+            2: (0x2E, 0, 0xD0),
+            3: (0x45, 0, 0xB9),
+            4: (0x5C, 0, 0xA2),
+            5: (0x73, 0, 0x8B),
+            6: (0x8B, 0, 0x73),
+            7: (0xA2, 0, 0x5C),
+            8: (0xB9, 0, 0x45),
+            9: (0xD0, 0, 0x2E),
+            10: (0xE7, 0, 0x17),
+            11: (0xFF, 0, 0)
+        }
         self.green_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 0.0]), kind="linear", assume_sorted=True)
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
@@ -63,7 +76,7 @@ class SpotifyVisualizer:
         self.red_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 255.0]), kind="linear", assume_sorted=True)
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
-        self.start_color = (0, 0, 255)
+        self.start_color = (0, 255, 0)
         self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi=10, sclk=11, order='rgb')
         self.track = None
         self.track_duration = None
@@ -114,18 +127,9 @@ class SpotifyVisualizer:
         self.playback_pos = track_progress
         self.pos_lock.release()
 
-    def _calculate_gradient_color(self, slider, pitch_strength):
-        """Calculates the color of the gradient based on slider value (0.0 maps to start color, 1.0 maps to end color)
-
-        The slider represents the position in the gradient we are interested in. A slider value of 0.0 corresponds to
-        the start color of the gradient, 0.5 corresponds to the color exactly between the start and end colors, and 1.0
-        corresponds to the end color.
-
-        Args:
-             slider (float): a value from 0.0 to 1.0 representing a position in the gradient
-        """
+    def _calculate_gradient_color(self, slider, pitch_strength, zone_index):
         start_r, start_g, start_b = self.start_color
-        end_r, end_g, end_b = self.end_color
+        end_r, end_g, end_b = self.end_colors[zone_index]
         r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
         curr_r = int(start_r + (pitch_strength * r_diff))
         curr_g = int(start_g + (pitch_strength * g_diff))
@@ -134,7 +138,7 @@ class SpotifyVisualizer:
         r_diff, g_diff, b_diff = curr_r - start_r, curr_g - start_g, curr_b - start_b
         r = int(start_r + (slider * r_diff))
         g = int(start_g + (slider * g_diff))
-        b = int(start_b + (slider* b_diff))
+        b = int(start_b + (slider * b_diff))
         
         return r, g, b
 
@@ -214,6 +218,22 @@ class SpotifyVisualizer:
         self.buffer_lock.release()
         return to_return
 
+    @staticmethod
+    def _gradient_non_linearity_function(strength_value):
+        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
+
+        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
+        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
+        calculating the color gradient in each pitch zone (i.e. color strength is strongest in the center of a zone and
+        weakest near the edges of a zone. Applying this non-linearity to the strength_value results in more appealing
+        visualizations.
+
+        Args:
+            strength_value (float): a normalized (between 0.0 and 1.0) value representing the strength of a color. Used
+                                    for calculating color gradients in pitch zones.
+        """
+        return (1.0 - (strength_value - 1.0) ** 2) ** 0.5
+
     def _load_track_data(self, chunk_length=12):
         """Obtain track data from the Spotify API and run necessary analysis to generate data needed for visualization.
 
@@ -291,6 +311,21 @@ class SpotifyVisualizer:
         self.buffer_lock.release()
 
     @staticmethod
+    def _loudness_non_linearity_function(strength_value):
+        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
+
+        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
+        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
+        calculating how many LED pixels to activate (based on loudness). Applying this non-linearity to the loudness
+        strength_value results in more appealing visualizations.
+
+        Args:
+            strength_value (float): a normalized (between 0.0 and 1.0) strength value representing loudness. Used when
+            calculating how many LED pixels to activate.
+        """
+        return 1.0 + np.tanh(strength_value - 1)
+
+    @staticmethod
     def _normalize_loudness(loudness, range_max=-4.0, range_min=-54.0):
         """Normalize a loudness value to the range specified.
 
@@ -311,37 +346,6 @@ class SpotifyVisualizer:
             range_min = loudness
         range_size = range_max - range_min
         return (loudness - range_min) / range_size
-
-    @staticmethod
-    def _gradient_non_linearity_function(strength_value):
-        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
-
-        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
-        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
-        calculating the color gradient in each pitch zone (i.e. color strength is strongest in the center of a zone and
-        weakest near the edges of a zone. Applying this non-linearity to the strength_value results in more appealing
-        visualizations.
-
-        Args:
-            strength_value (float): a normalized (between 0.0 and 1.0) value representing the strength of a color. Used
-                                    for calculating color gradients in pitch zones.
-        """
-        return (1.0 - (strength_value - 1.0)**2)**0.5
-
-    @staticmethod
-    def _loudness_non_linearity_function(strength_value):
-        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
-
-        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
-        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
-        calculating how many LED pixels to activate (based on loudness). Applying this non-linearity to the loudness
-        strength_value results in more appealing visualizations.
-
-        Args:
-            strength_value (float): a normalized (between 0.0 and 1.0) strength value representing loudness. Used when
-            calculating how many LED pixels to activate.
-        """
-        return 1.0 + np.tanh(strength_value - 1)
 
     def _push_visual_to_strip(self, loudness_func, pitch_funcs, timbre_funcs, pos):
         """Displays a visual on LED strip based on the loudness, pitches and timbre at current playback position.
@@ -366,38 +370,27 @@ class SpotifyVisualizer:
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
             pitch_val = pitch_funcs[i](pos)
-            if pitch_val < 0:
-                print('__________________***********************{}***********************__________________'.format(pitch_val))
-                raise Exception()
             if i in range(6):
-                start = lower+(i*length//12)
-                end = lower+((i+1)*length//12)
+                start = lower + (i * length // 12)
+                end = lower + ((i + 1) * length // 12)
             else:
                 start = upper - ((11 - i + 1) * length // 12)
                 end = upper - ((11 - i) * length // 12)
             segment_len = end - start
             segment_mid = start + (segment_len // 2)
 
-            # Reduce the strength of the rgb values near the ends of the zone to produce a fade gradient effect
+            # Reduce the strength of the RGB values near the ends of the zone to produce a fade gradient effect
             for j in range(start, segment_mid):
-                slider = (j - start) / (segment_mid - start) if segment_mid != start else 1.0
-                if slider < 0:
-                    print("----------------")
-                    print("j", j, "start", start, "segment_mid", segment_mid)
-                    print("----------------")
+                slider = (1.0 + (j - start)) / (1 + (segment_mid - start)) if segment_mid != start else 1.0
                 nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val)
+                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
                 self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
-            nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val)
+            nl_r, nl_g, nl_b = self._calculate_gradient_color(1.0, pitch_val, i)
             self.strip.set_pixel(segment_mid, nl_r, nl_g, nl_b, brightness)
             for j in range(segment_mid+1, end + 1):
-                slider = 1.0 - ((j - (segment_mid + 1)) / (end - segment_mid)) if segment_mid != end else 1.0
-                if slider < 0:
-                    print("----------------")
-                    print("j", j, "start", start, "segment_mid", segment_mid, "end", end)
-                    print("----------------")
+                slider = 1.0 - ((j - (segment_mid + 2.0)) / (1.0 + (end - segment_mid))) if segment_mid != end else 1.0
                 nl_slider = SpotifyVisualizer._gradient_non_linearity_function(slider)
-                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val)
+                nl_r, nl_g, nl_b = self._calculate_gradient_color(slider, pitch_val, i)
                 self.strip.set_pixel(j, nl_r, nl_g, nl_b, brightness)
 
         # Make sure to clear ends of the strip that are not in use and update strip
