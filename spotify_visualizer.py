@@ -48,7 +48,6 @@ class SpotifyVisualizer:
     """
 
     def __init__(self, num_pixels):
-        self.blue_grad_func = interp1d(np.array([0.0, 1.01]), np.array([255.0, 0.0]), kind="linear", assume_sorted=True)
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
@@ -65,7 +64,6 @@ class SpotifyVisualizer:
             10: (0xE7, 0, 0x17),
             11: (0xFF, 0, 0)
         }
-        self.green_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 0.0]), kind="linear", assume_sorted=True)
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
@@ -73,7 +71,6 @@ class SpotifyVisualizer:
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
-        self.red_grad_func = interp1d(np.array([0.0, 1.01]), np.array([0.0, 255.0]), kind="linear", assume_sorted=True)
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 255, 0)
@@ -128,7 +125,12 @@ class SpotifyVisualizer:
         self.pos_lock.release()
 
     def _calculate_gradient_color(self, slider, pitch_strength, zone_index):
+        if pitch_strength < 0.0:
+            pitch_strength = 0.0
+        elif pitch_strength > 1.0:
+            pitch_strength = 1.0
         start_r, start_g, start_b = self.start_color
+        
         end_r, end_g, end_b = self.end_colors[zone_index]
         r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
         curr_r = int(start_r + (pitch_strength * r_diff))
@@ -271,7 +273,7 @@ class SpotifyVisualizer:
         # Perform data interpolation
         start_times = np.array(s_t)
         loudnesses = np.array(l)
-        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='linear', assume_sorted=True)
+        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
         interpolated_pitch_funcs, interpolated_timbre_funcs = [], []
         for i in range(12):
             # Create a separate interpolated pitch function for each of the 12 elements of the pitch vectors
@@ -288,7 +290,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [timbre_list[i] for timbre_list in timbre_lists],
-                    kind="linear",
+                    kind="cubic",
                     assume_sorted=True
                 )
             )
@@ -341,9 +343,9 @@ class SpotifyVisualizer:
             The normalized loudness value (float between 0.0 and 1.0) for the specified range.
         """
         if loudness > range_max:
-            range_max = loudness
+            return 1.0
         if loudness < range_min:
-            range_min = loudness
+            return 0.0
         range_size = range_max - range_min
         return (loudness - range_min) / range_size
 
