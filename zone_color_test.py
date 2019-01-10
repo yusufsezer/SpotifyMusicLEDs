@@ -1,6 +1,7 @@
 """A module to help experiment with different color combinations for 12-zone pitch visuazization
 """
 import apa102
+import time
 
 def _apply_gradient_fade(r, g, b, strength):
     """Fade the passed RGB value towards the gradient start color based on strength
@@ -31,10 +32,10 @@ num_pixels = 240
 strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi=10, sclk=11, order='rgb')
 
 # Initialize colors for visualization
-start_color = (0, 0xB5, 0xFF)
+start_color = (0, 0, 0xFF)
 end_colors = {
             0: (0xFF, 0xFF, 0xFF),
-            1: (0xE7, 0xF4 0xE7),
+            1: (0xE7, 0xF4, 0xE7),
             2: (0xD0, 0E9, 0xD0),
             3: (0xB9, 0xDE, 0xB9),
             4: (0xA2, 0xD3, 0xA2),
@@ -48,6 +49,11 @@ end_colors = {
         }
 
 brightness = 100
+
+# Fill strip with start color
+start_r, start_g, start_b = start_color
+strip.fill(0, num_pixels, start_r, start_g, start_b, brightness)
+strip.show()
 
 # Segment strip into 12 zones (1 zone for each of the 12 pitch keys)
 for i in range(0, 12):
@@ -64,9 +70,10 @@ for i in range(0, 12):
 
     # Fade zone to full strength and back
     for j in range(201):
-        time.sleep(0.02)
         strength = j / 100
         if strength > 1.0:
             strength = 2.0 - strength
         faded_r, faded_g, faded_b = _apply_gradient_fade(r, g, b, strength)
         strip.fill(start, end, faded_r, faded_g, faded_b, brightness)
+        strip.show()
+        time.sleep(0.02)
