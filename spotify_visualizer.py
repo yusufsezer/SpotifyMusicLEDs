@@ -51,18 +51,18 @@ class SpotifyVisualizer:
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
-            0: (0, 0, 0xFF),
-            1: (0x17, 0, 0xE7),
-            2: (0x2E, 0, 0xD0),
-            3: (0x45, 0, 0xB9),
-            4: (0x5C, 0, 0xA2),
-            5: (0x73, 0, 0x8B),
-            6: (0x8B, 0, 0x73),
-            7: (0xA2, 0, 0x5C),
-            8: (0xB9, 0, 0x45),
-            9: (0xD0, 0, 0x2E),
-            10: (0xE7, 0, 0x17),
-            11: (0xFF, 0, 0)
+            0: (0xFF, 0xFF, 0xFF),
+            1: (0xF5, 0xE7, 0xE7),
+            2: (0xEC, 0xD0, 0xD0),
+            3: (0xE3, 0xB9, 0xB9),
+            4: (0xD9, 0xA2, 0xA2),
+            5: (0xD0, 0x8B, 0x8B),
+            6: (0xC7, 0x73, 0x73),
+            7: (0xBE, 0x5C, 0x5C),
+            8: (0xB4, 0x45, 0x45),
+            9: (0xAB, 0x2E, 0x2E),
+            10: (0xA2, 0x17, 0x17),
+            11: (0x99, 0, 0)
         }
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
@@ -73,7 +73,7 @@ class SpotifyVisualizer:
         self.pos_lock = threading.Lock()
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
-        self.start_color = (0, 255, 0)
+        self.start_color = (0, 0, 255)
         self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi=10, sclk=11, order='rgb')
         self.track = None
         self.track_duration = None
