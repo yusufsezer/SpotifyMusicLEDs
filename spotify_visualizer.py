@@ -1,5 +1,5 @@
 # !/usr/bin/env python3
-# import apa102
+import apa102
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 import numpy as np
 from scipy.interpolate import interp1d
@@ -7,44 +7,53 @@ import spotipy
 import spotipy.util as util
 import threading
 import time
-import apa102
 
 
 class SpotifyVisualizer:
-    """A class that allows for multithreaded music visualization via the Spotify API and an LED strip.
+    """A class that allows for multi-threaded music visualization via the Spotify API, a Raspberry Pi, and an LED strip.
 
-    This class allows for multithreaded music visualization via the Spotify API and an APA102 LED strip. This code was
+    This class allows for multi-threaded music visualization via the Spotify API and an APA102 LED strip. This code was
     developed and tested using a 240-pixel (4 meter) Adafruit Dotstar LED strip, a Raspberry Pi 3 Model B and my
     personal Spotify account. After initializing an instance of this class, simply call visualize() to begin
     visualization (alternatively, simply run this module). Visualization will continue until the program is interrupted
     or terminated. There are 4 threads: one for visualization, one for periodically syncing the playback position with
     the Spotify API, one for loading chunks of track data, and one to periodically check if the user's current track has
     changed.
+    Currently, loudness and pitch data are used to generate and display visualizations on the LED strip. Loudness is
+    used to determine how many pixels to light (growing from the center of the strip towards the ends). At any given
+    moment, the number of lit pixels is segmented into 12 equal-length zones (one zone for each of the 12 major pitch
+    keys). Each zone fades from start_color to its corresponding end color in end_colors. If the pitch key corresponding
+    to a zone is very strong (high presence), that zone will be set to its end color. If the pitch key corresponding to
+    a zone is very weak, then the zone will be set to start_color. If the pitch key corresponding to a zone is of
+    intermediate strength, then the zone will be set to a color value between start_color and its end color.
+    Additionally, A fade effect is applied to the ends of each zone; the color of the middle pixel of a zone will be set
+    purely based on the strength of the corresponding pitch. Pixels towards the end of each zone, however, will fade
+    back towards start_color.
 
     Args:
         num_pixels (int): The number of pixels (LEDs) supported by the LED strip.
 
     Attributes:
-            buffer_lock (Lock): A lock for the interpolated buffers.
-            data_segments (list): Data segments to be parsed and interpreted (fetched from Spotify API).
-            end_colors (dict): a dict of 12 RGB tuples; each tuple represents the end-gradient-color for a pitch zone
-            interpolated_loudness_buffer (list): Producer-consumer buffer holding interpolated loudness functions.
-            interpolated_pitch_buffer (list): Producer-consumer buffer holding lists of interpolated pitch functions.
-            interpolated_timbre_buffer (list): Producer-consumer buffer holding lists of interpolated timbre functions.
-            num_pixels (int): The number of pixels (LEDs) on the LED strip.
-            permission_scopes (str): A space separated str of the required permission scopes over the user's account.
-            playback_pos (float): The current playback position (offset into track in seconds) of the visualization.
-            pos_lock (Lock): A lock for playback_pos.
-            should_terminate (bool): A variable watched by all child threads (child threads exit if set to True).
+            buffer_lock (threading.Lock): a lock for accessing/modifying the buffers of interpolated functions.
+            data_segments (list): data segments to be parsed and interpreted (fetched from Spotify API).
+            end_colors (dict): a dict of 12 RGB 3-tuples; map pitch zone indices to the end-gradient-color for the zone.
+            interpolated_loudness_buffer (list): producer-consumer buffer holding interpolated loudness functions.
+            interpolated_pitch_buffer (list): producer-consumer buffer holding lists of interpolated pitch functions.
+            interpolated_timbre_buffer (list): producer-consumer buffer holding lists of interpolated timbre functions.
+            num_pixels (int): the number of pixels (LEDs) on the LED strip.
+            permission_scopes (str): a space-separated str of the required permission scopes over the user's account.
+            playback_pos (float): the current playback position (offset into track in seconds) of the visualization.
+            pos_lock (threading.Lock): a lock for accessing/modifying playback_pos.
+            should_terminate (bool): a variable watched by all child threads (child threads exit if set to True).
             sp_gen (Spotify): Spotify object to handle main thread's interaction with the Spotify API.
             sp_load (Spotify): Spotify object to handle data loading thread's interaction with the Spotify API.
             sp_skip (Spotify): Spotify object to handle skip detection thread's interaction with the Spotify API.
             sp_sync (Spotify): Spotify object to handle synchronization thread's interaction with the Spotify API.
             sp_vis (Spotify): Spotify object to handle visualization thread's interaction with the Spotify API.
-            start_color (tuple): a 3-tuple of ints for the RGB value representing the start color of the pitch gradient
+            start_color (tuple): a 3-tuple of ints for the RGB value representing the start color of the pitch gradient.
             strip (APA102): APA102 object to handle interfacing with the LED strip.
-            track (dict): Contains information about the track that is being visualized.
-            track_duration (float): The duration in seconds of the track that is being visualized.
+            track (dict): contains information about the track that is being visualized.
+            track_duration (float): the duration in seconds of the track that is being visualized.
     """
 
     def __init__(self, num_pixels):
@@ -87,7 +96,7 @@ class SpotifyVisualizer:
                                            SPOTIPY_CLIENT_SECRET,
                                            SPOTIPY_REDIRECT_URI)
         if token:
-            # Instantiate multiple Spotify objects, because sharing a Spotify object can block threads
+            # Instantiate multiple Spotify objects because sharing a Spotify object can block threads
             self.sp_gen = spotipy.Spotify(auth=token)
             self.sp_vis = spotipy.Spotify(auth=token)
             self.sp_sync = spotipy.Spotify(auth=token)
@@ -105,7 +114,7 @@ class SpotifyVisualizer:
         print(SpotifyVisualizer._make_text_effect(text, ["green", "bold"]))
         while not self.track:
             self.track = self.sp_gen.current_user_playing_track()
-            time.sleep(0.5)
+            time.sleep(1)
         track_name = self.track["item"]["name"]
         artists = ', '.join((artist["name"] for artist in self.track["item"]["artists"]))
         text = "Loaded track: {} by {}.".format(track_name, artists)
@@ -153,19 +162,19 @@ class SpotifyVisualizer:
             print(SpotifyVisualizer._make_text_effect(text, ["green"]))
 
     def _apply_gradient_fade(self, r, g, b, strength):
-        """Fade the passed RGB value towards the gradient start color based on strength
+        """Fade the passed RGB value towards start_color based on strength
 
         Note that a strength value of 0.0 results in the start color of the gradient, and a strength value of 1.0
-        results in the same RGB color that was passed (no fade is applied)
+        results in the same RGB color that was passed (no fade is applied).
 
         Args:
-             r (int): represents the red value (in range [0, 255]) of the RGB color to fade
-             b (int): represents the blue value (in range [0, 255]) of the RGB color to fade
-             g (int): represents the green value (in range [0, 255]) of the RGB color to fade
-             strength (float): a strength value representing how strong the RGB color should be (in range [0.0, 1.0])
+             r (int): represents the red value (in range [0, 0xFF]) of the RGB color to fade.
+             b (int): represents the blue value (in range [0, 0xFF]) of the RGB color to fade.
+             g (int): represents the green value (in range [0, 0xFF]) of the RGB color to fade.
+             strength (float): a strength value representing how strong the RGB color should be (in range [0.0, 1.0]).
 
         Returns:
-            a 3-tuple of ints representing the RGB value with fade applied
+            a 3-tuple of ints representing the RGB value with fade applied.
         """
         start_r, start_g, start_b = self.start_color
         r_diff, g_diff, b_diff = r - start_r, g - start_g, b - start_b
@@ -177,19 +186,19 @@ class SpotifyVisualizer:
         return faded_r, faded_g, faded_b
 
     def _calculate_zone_color(self, pitch_strength, zone_index):
-        """Calculate the color to visualize based on the pitch/zone index and corresponding pitch strenghth.
+        """Calculate the color to visualize based on the pitch/zone index and corresponding pitch strength.
 
         The visualizer divides the lit portion of the strip into 12 equal-length zones, one for each of the 12 major
         pitch keys. This function calculates what color should be displayed in the zone specified by zone_index if the
         corresponding pitch has strength pitch_strength (0.0 corresponds to lowest strength, 1.0 corresponds to maximum
-        strength)
+        strength).
 
         Args:
-            pitch_strength (float): a value representing how strong or present a pitch is (normalized to [0.0, 1.0])
-            zone_index (int): an index in range(12) corresponding to the pitch-key/zone
+            pitch_strength (float): a value representing how strong or present the pitch is (normalized to [0.0, 1.0]).
+            zone_index (int): an index in range [0, 11] corresponding to the zone/pitch key.
 
         Returns:
-            a 3-tuple of ints representing an RGB value
+            a 3-tuple of ints representing the RGB value that should be displayed in the zone specified by zone_index.
         """
         if pitch_strength < 0.0:
             pitch_strength = 0.0
@@ -209,11 +218,11 @@ class SpotifyVisualizer:
     def _continue_checking_if_skip(self, wait=0.33):
         """Continuously checks if the user's playing track has changed. Called asynchronously (worker thread).
 
-        If the user's currently playing track has changed (is different from track), then this function pauses the user's
-        playback and sets should_terminate to True, resulting in the termination of all worker threads.
+        If the user's currently playing track has changed (is different from track), then this function pauses the
+        user's playback and sets should_terminate to True, resulting in the termination of all worker threads.
 
         Args:
-            wait (float): The amount of time in seconds to wait between each check.
+            wait (float): the amount of time in seconds to wait between each check.
         """
         track = self.sp_skip.current_user_playing_track()
         while track["item"]["id"] == self.track["item"]["id"]:
@@ -228,12 +237,12 @@ class SpotifyVisualizer:
         """Continuously loads and prepares chunks of data. Called asynchronously (worker thread).
 
         Args:
-            wait (float): The amount of time in seconds to wait between each call to _load_track_data().
+            wait (float): the amount of time in seconds to wait between each call to _load_track_data().
         """
         while len(self.data_segments) != 0 and not self.should_terminate:
             self._load_track_data()
             time.sleep(wait)
-        text = "Killing data loading thread. All data for current track has been loaded."
+        text = "Killing data loading thread."
         print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
         exit(0)
 
@@ -253,26 +262,26 @@ class SpotifyVisualizer:
         exit(0)
 
     def _get_buffers_for_pos(self, pos):
-        """Find interpolated functions that have the specified position within their bounds via binary search.
+        """Find the interpolated functions that have the specified position within their bounds via binary search.
 
         Args:
-            pos (float): The playback position to find interpolated functions for.
+            pos (float): the playback position to find interpolated functions for.
 
         Returns:
-             A 3-tuple of interp1d objects (interpolated loudness, pitch and timbre functions) or None if search fails.
+             a 3-tuple of interp1d objects (interpolated loudness, pitch and timbre functions) or None if search fails.
         """
         self.buffer_lock.acquire()
         start, end, index, to_return = 0, len(self.interpolated_loudness_buffer) - 1, None, None
         while start <= end:
             mid = start + (end - start) // 2
-            l_bound, u_bound, _ = self.interpolated_loudness_buffer[mid]
-            if l_bound <= pos <= u_bound:
+            lower_bound, upper_bound, _ = self.interpolated_loudness_buffer[mid]
+            if lower_bound <= pos <= upper_bound:
                 index = mid
                 break
-            if pos < l_bound:
-                end = mid-1
-            elif pos > u_bound:
-                start = mid+1
+            if pos < lower_bound:
+                end = mid - 1
+            if pos > upper_bound:
+                start = mid + 1
         if index is not None:
             to_return = (
                     self.interpolated_loudness_buffer[index][-1],
@@ -281,25 +290,6 @@ class SpotifyVisualizer:
             )
         self.buffer_lock.release()
         return to_return
-
-    @staticmethod
-    def _gradient_non_linearity_function(strength_value):
-        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
-
-        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
-        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
-        calculating the color gradient in each pitch zone (i.e. color strength is strongest in the center of a zone and
-        weakest near the edges of a zone. Applying this non-linearity to the strength_value results in more appealing
-        visualizations.
-
-        Args:
-            strength_value (float): a normalized (between 0.0 and 1.0) value representing the strength of a color. Used
-                                    for calculating color gradients in pitch zones.
-
-        Returns:
-            strength_value after application of the non-linearity function (float in range [0.0, 1.0])
-        """
-        return (1.0 - (strength_value - 1.0) ** 2) ** 0.5
 
     def _load_track_data(self, chunk_length=12):
         """Obtain track data from the Spotify API and run necessary analysis to generate data needed for visualization.
@@ -311,12 +301,25 @@ class SpotifyVisualizer:
         Args:
             chunk_length (float): the number of seconds of track data to analyze.
         """
-        # Get track audio data for current song from Spotify API if necessary
+        # If necessary, get audio data for the track from the Spotify API and pad the data
         if not self.data_segments:
             analysis = self.sp_load.audio_analysis(self.track["item"]["id"])
-            self.data_segments.append({"start": -0.1, "loudness_start": -25.0, "pitches": 12*[0], "timbre": 12*[0]})
+            self.data_segments.append(
+                {
+                    "start": -0.1,
+                    "loudness_start": -25.0,
+                    "pitches": 12*[0],
+                    "timbre": 12*[0]
+                }
+            )
             self.data_segments += analysis["segments"]
-            self.data_segments.append({"start": self.track_duration+0.01, "loudness_start": -25.0, "pitches": 12*[0], "timbre": 12*[0]})
+            self.data_segments.append(
+                {
+                    "start": self.track_duration + 0.01,
+                    "loudness_start": -25.0, "pitches": 12*[0],
+                    "timbre": 12*[0]
+                }
+            )
 
         # Extract useful data for the next chunk_length seconds of playback
         s_t, l, pitch_lists, timbre_lists = [], [], [], []
@@ -332,6 +335,7 @@ class SpotifyVisualizer:
                 break
             i += 1
         chunk_end = self.data_segments[i]["start"] if i < len(self.data_segments) else self.data_segments[-1]["start"]
+
         # Discard data segments that were just analyzed
         self.data_segments = self.data_segments[i:]
 
@@ -360,7 +364,7 @@ class SpotifyVisualizer:
                 )
             )
 
-        # Add interpolated functions and their bounds to buffers for consumption by visualizer thread
+        # Add interpolated functions and their bounds to buffers for consumption by visualization thread
         self.buffer_lock.acquire()
         self.interpolated_loudness_buffer.append((chunk_start, chunk_end, interpolated_loudness_func))
         self.interpolated_pitch_buffer.append((chunk_start, chunk_end, interpolated_pitch_funcs))
@@ -373,27 +377,9 @@ class SpotifyVisualizer:
         pitch_report = "Interpolated pitch buffer size: {}.\n".format(len(self.interpolated_pitch_buffer))
         timbre_report = "Interpolated timbre buffer size: {}.\n".format(len(self.interpolated_timbre_buffer))
         closer = "--------------------------------------------------------"
+        self.buffer_lock.release()
         text = title + data_seg_report + loudness_report + pitch_report + timbre_report + closer
         print(SpotifyVisualizer._make_text_effect(text, ["blue"]))
-        self.buffer_lock.release()
-
-    @staticmethod
-    def _loudness_non_linearity_function(strength_value):
-        """A non-linearity function to map strength_value (float 0.0 to 1.0) to a new strength value (float 0.0 to 1.0)
-
-        This non-linearity function maps a strength value (float between 0.0 and 1.0 where 1.0 is full strength) to a
-        new strength value (float between 0.0 and 1.0 where 1.0 is full strength). This function is used when
-        calculating how many LED pixels to activate (based on loudness). Applying this non-linearity to the loudness
-        strength_value results in more appealing visualizations.
-
-        Args:
-            strength_value (float): a normalized (between 0.0 and 1.0) strength value representing loudness. Used when
-            calculating how many LED pixels to activate.
-
-        Returns:
-            strength_value after application of the non-linearity function (float in range [0.0, 1.0])
-        """
-        return 1.0 + np.tanh(strength_value - 1)
 
     @staticmethod
     def _make_text_effect(text, text_effects):
@@ -403,11 +389,11 @@ class SpotifyVisualizer:
             "green", "red", "blue", "bold"
 
         Args:
-            text (str): The text to apply effects to.
-            text_effects (list): A list of str, each str representing an effect to apply to the text.
+            text (str): the text to apply effects to.
+            text_effects (list): a list of str, each str representing an effect to apply to the text.
 
         Returns:
-            Text (str) with effects applied.
+            text (str) with effects applied.
         """
         effects = {
             "green": "\033[92m",
@@ -420,8 +406,7 @@ class SpotifyVisualizer:
         for effect in text_effects:
             msg_with_fx += effects[effect]
         msg_with_fx += text
-        for _ in range(len(text_effects)):
-            msg_with_fx += end_code
+        msg_with_fx += end_code * len(text_effects)
         return msg_with_fx
 
     @staticmethod
@@ -434,7 +419,7 @@ class SpotifyVisualizer:
             range_max (float): the upper bound of the range.
 
         Returns:
-            The normalized loudness value (float between 0.0 and 1.0) for the specified range.
+            the normalized loudness value (float between 0.0 and 1.0) for the specified range.
         """
         if loudness > range_max:
             return 1.0
@@ -444,16 +429,15 @@ class SpotifyVisualizer:
         return (loudness - range_min) / range_size
 
     def _push_visual_to_strip(self, loudness_func, pitch_funcs, timbre_funcs, pos):
-        """Displays a visual on LED strip based on the loudness, pitches and timbre at current playback position.
+        """Displays a visual on the LED strip based on the loudness, pitches and timbre at current playback position.
 
         Args:
-            loudness_func (interp1d): Interpolated loudness function.
-            pitch_funcs (list): A list of interpolated pitch functions (one pitch function for each major musical key).
-            timbre_funcs (list): A list of interpolated timbre functions (one timbre function for each basis function).
+            loudness_func (interp1d): interpolated loudness function.
+            pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
+            timbre_funcs (list): a list of interpolated timbre functions (one timbre function for each basis function).
         """
-        # Normalize loudness and apply non-linearity function
+        # Normalize loudness
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
-        nl_norm_loudness = SpotifyVisualizer._loudness_non_linearity_function(norm_loudness)
         print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
@@ -475,7 +459,7 @@ class SpotifyVisualizer:
             segment_len = end - start
             segment_mid = start + (segment_len // 2)
 
-            # Set middle pixel to always be green (if odd number of pixels, segments don't cover middle pixel)
+            # Set middle pixel to always be start_color (if odd number of pixels, segments don't cover middle pixel)
             start_r, start_g, start_b = self.start_color
             self.strip.set_pixel(mid, start_r, start_g, start_b, brightness)
 
@@ -498,17 +482,17 @@ class SpotifyVisualizer:
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
         """
-        self.should_terminate = False
-        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
-        self.strip.show()
-        self.track = None
-        self.track_id = None
-        self.track_duration = None
-        self.playback_pos = 0
         self.data_segments = []
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
+        self.playback_pos = 0
+        self.should_terminate = False
+        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
+        self.strip.show()
+        self.track = None
+        self.track_duration = None
+        self.track_id = None
 
     def _reset_track(self):
         """Pauses track and seeks to beginning.
@@ -533,8 +517,7 @@ class SpotifyVisualizer:
 
         if not self.sp_vis.current_playback()["is_playing"]:
             self.sp_vis.start_playback()
-        pos = self.playback_pos
-        self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, pos)
+
         # Visualize until end of track
         pos = self.playback_pos
         while pos <= self.track_duration:
@@ -543,6 +526,7 @@ class SpotifyVisualizer:
                 text = "Killing visualization thread."
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 exit(0)
+
             try:
                 pos = self.playback_pos
                 self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, pos)
@@ -555,6 +539,7 @@ class SpotifyVisualizer:
                     text = "Killing visualization thread."
                     print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                     exit(0)
+
             self.pos_lock.acquire()
             self.playback_pos += sample_rate
             self.pos_lock.release()
