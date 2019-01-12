@@ -401,7 +401,7 @@ class SpotifyVisualizer:
         # Perform data interpolation for loudness, pitch, timbre, and beat times
         start_times = np.array(s_t)
         loudnesses = np.array(l)
-        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='linear', assume_sorted=True)
+        interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
         interpolated_beats_func = interp1d(beat_times, beat_times, kind='previous', assume_sorted=True)
         interpolated_pitch_funcs, interpolated_timbre_funcs = [], []
         for i in range(12):
