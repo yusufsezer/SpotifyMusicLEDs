@@ -344,7 +344,6 @@ class SpotifyVisualizer:
                     "timbre": 12*[0]
                 }
             )
-            beats = analysis["beats"]
             self.beats.append(
                 {
                     "start": -0.1,
@@ -352,7 +351,7 @@ class SpotifyVisualizer:
                     "confidence": 0.0
                 }
             )
-            self.beats.append(beats)
+            self.beats += analysis["beats"]
             self.beats.append(
                 {
                     "start": self.track_duration + 0.1,
