@@ -502,16 +502,19 @@ class SpotifyVisualizer:
         # Normalize loudness
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
-        beat_start = beat_func(pos)
+        prev_beat_start = beat_func(pos)
         beat_dur, beat_conf = self.beat_info[beat_start]
-        print("Previous beat at {} with duration {} and confidence {}".format(beat_start, beat_dur, beat_conf))
+        print("Previous beat at {} with duration {} and confidence {}".format(prev_beat_start, beat_dur, beat_conf))
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels // 2
         length = int(self.num_pixels * norm_loudness)
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
-        brightness = 100
+
+        # Determine brightness based on time elapsed since previous beat and beat duration
+        time_elapsed = pos - prev_beat_start
+        brightness = 100 - (70 * (time_elapsed / beat_dur))
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
