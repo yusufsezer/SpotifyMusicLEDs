@@ -502,7 +502,7 @@ class SpotifyVisualizer:
         # Normalize loudness
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
-        prev_beat_start = beat_func(pos)
+        prev_beat_start = np.asscalar(beat_func(pos))
         beat_dur, beat_conf = self.beat_info[beat_start]
         print("Previous beat at {} with duration {} and confidence {}".format(prev_beat_start, beat_dur, beat_conf))
 
