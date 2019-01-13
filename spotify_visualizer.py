@@ -512,10 +512,12 @@ class SpotifyVisualizer:
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
 
-        # Determine brightness based on time elapsed since previous beat and beat duration
-        time_elapsed = pos - prev_beat_start
-        brightness = 100 - (90 * (time_elapsed / beat_dur)) if beat_dur != 0.0 else 10
-        print("brightness {}".format(brightness))
+        # Adjust brightness based on time elapsed since previous beat and beat duration for beats with high confidence
+        brightness = 10
+        if beat_conf > 0.8:
+            time_elapsed = pos - prev_beat_start
+            brightness = 100 - (90 * (time_elapsed / beat_dur)) if beat_dur != 0.0 else 10
+            print("brightness {}".format(brightness))
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
