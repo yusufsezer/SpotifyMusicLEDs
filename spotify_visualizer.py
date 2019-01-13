@@ -89,7 +89,7 @@ class SpotifyVisualizer:
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=20, mosi=10, sclk=11, order='rgb')
+        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=30, mosi=10, sclk=11, order='rgb')
         self.track = None
         self.track_duration = None
 
