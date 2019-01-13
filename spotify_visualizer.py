@@ -514,7 +514,7 @@ class SpotifyVisualizer:
 
         # Determine brightness based on time elapsed since previous beat and beat duration
         time_elapsed = pos - prev_beat_start
-        brightness = 100 - (70 * (time_elapsed / beat_dur))
+        brightness = 100 - (70 * (time_elapsed / beat_dur)) if beat_dur != 0.0 else 30
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
