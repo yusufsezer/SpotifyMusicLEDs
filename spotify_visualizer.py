@@ -1,6 +1,7 @@
 # !/usr/bin/env python3
 import apa102
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
+import json
 import numpy as np
 from scipy.interpolate import interp1d
 import spotipy
@@ -79,6 +80,7 @@ class SpotifyVisualizer:
             11: (0x99, 0, 0)
         }
         self.interpolated_beats_buffer = []
+        self.interpolated_label_func = None
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
@@ -360,6 +362,20 @@ class SpotifyVisualizer:
                 }
             )
 
+        # Load precomputed KMeans cluster data (based on timbre) from file if available for the current track
+        if self.track["name"] in ["Crawl Outta Love", "Ruin My Life"]:
+            filename = '_'.join((self.track["name"] + " timbre data").split(' ')) + ".txt"
+            with open(filename) as file:
+                kmeans_data = json.loads(file)
+            timestamps = kmeans_data["timestamps"]
+            cluster_labels = kmeans_data["cluster_labels"]
+            self.interpolated_label_func = interp1d(
+                timestamps,
+                cluster_labels,
+                kind='previous',
+                assume_sorted=True
+            )
+
         # Extract the next chunk_length seconds of useful loudness, pitch and timbre data
         s_t, l, pitch_lists, timbre_lists = [], [], [], []
         i = 0
@@ -506,6 +522,16 @@ class SpotifyVisualizer:
         beat_dur, beat_conf, should_visualize = self.beat_info[prev_beat_start]
         # print("Previous beat at {} with duration {} and confidence {}".format(prev_beat_start, beat_dur, beat_conf))
 
+        # Change start color (base color) based on KMeans clustering if available
+        if self.interpolated_label_func:
+            colors = {
+                0: (255, 0, 0),
+                1: (0, 255, 0),
+                2: (255, 0, 0)
+            }
+            label = self.interpolated_label_func(pos)
+            self.start_color = colors[label]
+
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels // 2
         length = int(self.num_pixels * norm_loudness)
@@ -557,6 +583,7 @@ class SpotifyVisualizer:
         """Reset certain attributes to prepare to visualize a new track.
         """
         self.data_segments = []
+        self.interpolated_label_func = None
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
