@@ -515,8 +515,9 @@ class SpotifyVisualizer:
         # Adjust brightness based on time elapsed since previous beat and beat duration for beats with high confidence
         brightness = 100
         if beat_conf > 0.6:
-           time_elapsed = pos - prev_beat_start
-           brightness = 100 - (90 * (time_elapsed / beat_dur)) if beat_dur != 0.0 else 10
+            time_elapsed = pos - prev_beat_start
+            multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
+            brightness = 10 + (90 * multiplier)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
@@ -620,4 +621,3 @@ if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and start visualization
     visualizer = SpotifyVisualizer(240)
     visualizer.visualize()
-0
