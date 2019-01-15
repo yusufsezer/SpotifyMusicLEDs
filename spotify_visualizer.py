@@ -363,10 +363,10 @@ class SpotifyVisualizer:
             )
 
         # Load precomputed KMeans cluster data (based on timbre) from file if available for the current track
-        if self.track["name"] in ["Crawl Outta Love", "Ruin My Life"]:
-            filename = '_'.join((self.track["name"] + " timbre data").split(' ')) + ".txt"
+        if self.track["item"]["name"] in ["Crawl Outta Love", "Ruin My Life"]:
+            filename = '_'.join((self.track["item"]["name"] + " timbre data").split(' ')) + ".txt"
             with open(filename) as file:
-                kmeans_data = json.loads(file)
+                kmeans_data = json.load(file)
             timestamps = kmeans_data["timestamps"]
             cluster_labels = kmeans_data["cluster_labels"]
             self.interpolated_label_func = interp1d(
@@ -403,7 +403,7 @@ class SpotifyVisualizer:
             beat_dur = self.beats[i]["duration"]
             beat_conf = self.beats[i]["confidence"]
             beat_times.append(beat_time)
-            self.beat_info[beat_time] = (beat_dur, beat_conf, False)
+            self.beat_info[beat_time] = [beat_dur, beat_conf, False]
             # If we've analyzed chunk_length seconds of data, and there is more than 2 beats remaining, break
             if self.beats[i]["start"] > b_chunk_start + chunk_length and i < len(self.beats) - 1:
                 break
@@ -488,7 +488,7 @@ class SpotifyVisualizer:
         return msg_with_fx
 
     @staticmethod
-    def _normalize_loudness(loudness, range_min=-54.0, range_max=-4.0):
+    def _normalize_loudness(loudness, range_min=-44.0, range_max=-4.0):
         """Normalize a loudness value to the range specified.
 
         Args:
@@ -527,9 +527,9 @@ class SpotifyVisualizer:
             colors = {
                 0: (255, 0, 0),
                 1: (0, 255, 0),
-                2: (255, 0, 0)
+                2: (0, 0, 255)
             }
-            label = self.interpolated_label_func(pos)
+            label = np.asscalar(self.interpolated_label_func(pos))
             self.start_color = colors[label]
             print("Cluster number: {}".format(label))
 
@@ -541,12 +541,14 @@ class SpotifyVisualizer:
 
         # Visualize beats of reasonable confidence if loudness is high (continue visualizing a beat if already started)
         brightness = 100
-        if (beat_conf > 0.4 and norm_loudness > 0.9) or should_visualize:
+        if norm_loudness > 0.99 or should_visualize:
             if not should_visualize:
-                self.beat_info[prev_beat_start][2] = True
+                self.beat_info[prev_beat_start][2] = [beat_dur, beat_conf, True]
             time_elapsed = pos - prev_beat_start
-            multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
-            brightness = 10 + (90 * multiplier)
+            multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 1.0 # 1.0 - (time_elapsed / beat_dur) if beat_dur != 0 else 1.0
+            #brightness = 10 + (90 * multiplier)
+            r, g, b = self._apply_gradient_fade(0, 255, 0, multiplier)
+            self.start_color = (r, g, b)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
@@ -579,12 +581,16 @@ class SpotifyVisualizer:
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
+        self.start_color = (0, 0, 255)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
         """
+        self.beat = []
+        self.beat_info = {}
         self.data_segments = []
         self.interpolated_label_func = None
+        self.interpolated_beats_buffer = []
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
         self.interpolated_timbre_buffer = []
@@ -616,7 +622,9 @@ class SpotifyVisualizer:
 
         if not self.sp_vis.current_playback()["is_playing"]:
             self.sp_vis.start_playback()
-
+        
+        self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, beat_func, pos)
+        
         # Visualize until end of track
         while pos <= self.track_duration:
             start = time.perf_counter()
@@ -651,3 +659,4 @@ if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and start visualization
     visualizer = SpotifyVisualizer(240)
     visualizer.visualize()
+0
