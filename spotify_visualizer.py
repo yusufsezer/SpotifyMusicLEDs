@@ -531,6 +531,7 @@ class SpotifyVisualizer:
             }
             label = self.interpolated_label_func(pos)
             self.start_color = colors[label]
+            print("Cluster number: {}".format(label))
 
         # Determine how many pixels to light (growing from center of strip) based on loudness
         mid = self.num_pixels // 2
