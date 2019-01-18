@@ -525,13 +525,13 @@ class SpotifyVisualizer:
         upper = mid + round(length / 2)
 
         # Visualize beats of reasonable confidence if loudness is high (continue visualizing a beat if already started)
-        brightness = 100
+        brightness = 50
         if (beat_conf > 0.4 and norm_loudness > 0.9) or should_visualize:
             if not should_visualize:
                 self.beat_info[prev_beat_start][2] = True
             time_elapsed = pos - prev_beat_start
             multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
-            brightness = 10 + (90 * multiplier)
+            brightness = 50 + (50 * multiplier)
 
         # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
         for i in range(0, 12):
