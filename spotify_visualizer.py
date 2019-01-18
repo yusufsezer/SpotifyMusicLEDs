@@ -612,8 +612,8 @@ class SpotifyVisualizer:
                 pos = self.playback_pos
                 self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, beat_func, pos)
             # If pitch or loudness value out of range, find the interpolated functions for the current position
-            except _ as err:
-                text = "EXCEPTION IN VISUALIZATION THREAD: {}.".format(err)
+            except ValueError as err:
+                text = "Caught ValueError: {}\nSearching for the appropriate interpolated functions for current playback position...".format(err)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 funcs = self._get_buffers_for_pos(pos)
                 if funcs:
