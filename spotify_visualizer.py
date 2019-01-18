@@ -588,9 +588,10 @@ class SpotifyVisualizer:
         loudness_func, pitch_funcs, timbre_funcs, beat_func = self._get_buffers_for_pos(pos)
 
         try:
-            while not self.sp_vis.current_playback()["is_playing"]:
+            if not self.sp_vis.current_playback()["is_playing"]:
                 self.sp_vis.start_playback()
-                time.sleep(0.5)
+        except:
+            pass
 
         # Visualize until end of track
         while pos <= self.track_duration:
