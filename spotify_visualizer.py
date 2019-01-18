@@ -1,7 +1,6 @@
 # !/usr/bin/env python3
 import apa102
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
-import json
 import numpy as np
 from scipy.interpolate import interp1d
 import spotipy
@@ -231,10 +230,14 @@ class SpotifyVisualizer:
         Args:
             wait (float): the amount of time in seconds to wait between each check.
         """
-        track = self.sp_skip.current_user_playing_track()
+        track = self.track
         while track["item"]["id"] == self.track["item"]["id"]:
+            try:
+                track = self.sp_skip.current_user_playing_track()
+            except:
+                text = "Error occurred while checking if track has changed...retrying in {} seconds.".format(wait)
+                print(SpotifyVisualizer._make_text_effect(text, "red", "bold"))
             time.sleep(wait)
-            track = self.sp_skip.current_user_playing_track()
         self.sp_skip.pause_playback()
         self.should_terminate = True
         text = "A skip has occurred."
@@ -247,7 +250,11 @@ class SpotifyVisualizer:
             wait (float): the amount of time in seconds to wait between each call to _load_track_data().
         """
         while len(self.data_segments) != 0 and not self.should_terminate:
-            self._load_track_data()
+            try:
+                self._load_track_data()
+            except:
+                text = "Error occurred while loading data chunk...retrying in {} seconds.".format(wait)
+                print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
             time.sleep(wait)
         text = "Killing data loading thread."
         print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
@@ -261,7 +268,11 @@ class SpotifyVisualizer:
         """
         pos = self.playback_pos
         while round(self.track_duration - pos) != 0 and not self.should_terminate:
-            self.sync()
+            try:
+                self.sync()
+            except:
+                text = "Error occurred while attempting to sync...retrying in {} seconds.".format(wait)
+                print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
             time.sleep(wait)
             pos = self.playback_pos
         text = "Killing synchronization thread."
