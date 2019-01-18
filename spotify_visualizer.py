@@ -512,33 +512,16 @@ class SpotifyVisualizer:
             timbre_funcs (list): a list of interpolated timbre functions (one timbre function for each basis function).
             beat_func (interp1d): interpolated beat start time function.
             pos (float): the current playback position (offset into the track in seconds).
-        """
-        # Get data for the most recent beat
-        prev_beat_start = np.asscalar(beat_func(pos))
-        beat_dur, beat_conf, visualization_initiated = self.beat_info[prev_beat_start]
-
-        # Get normalized loudness value for current playback position
+        """        # Get normalized loudness value for current playback position
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from center of strip) based on normalized loudness
+        brightness = 100
         mid = self.num_pixels // 2
         length = int(self.num_pixels * norm_loudness)
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
-        
-        # Save the current start_color (will need to restore this value after pushing visual to strip)
-        save_r, save_g, save_b = self.start_color
-        
-        # Visualize beat if the confidence is ok and loudness is high (continue visualizing a beat if already started)
-        brightness = 100
-        if beat_conf > 0.7 or visualization_initiated:
-            if not visualization_initiated:
-                self.beat_info[prev_beat_start] = (beat_dur, beat_conf, True)
-            time_elapsed = pos - prev_beat_start
-            multiplier = 1.0 - (time_elapsed / beat_dur) if beat_dur != 0 else 0
-            beat_r, beat_g, beat_b = self._apply_gradient_fade(255, 0, 255, multiplier)
-            self.start_color = (beat_r, beat_g, beat_b)
 
         # Set middle pixel to start_color (when an odd number of pixels are lit, segments don't cover the middle pixel)
         start_r, start_g, start_b = self.start_color
@@ -604,8 +587,10 @@ class SpotifyVisualizer:
         pos = self.playback_pos
         loudness_func, pitch_funcs, timbre_funcs, beat_func = self._get_buffers_for_pos(pos)
 
-        if not self.sp_vis.current_playback()["is_playing"]:
-            self.sp_vis.start_playback()
+        try:
+            while not self.sp_vis.current_playback()["is_playing"]:
+                self.sp_vis.start_playback()
+                time.sleep(0.5)
 
         # Visualize until end of track
         while pos <= self.track_duration:
@@ -620,15 +605,15 @@ class SpotifyVisualizer:
                 self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, beat_func, pos)
             # If pitch or loudness value out of range, find the interpolated functions for the current position
             except ValueError as err:
-                text = "Caught ValueError: {}\nSearching for the appropriate interpolated functions for current playback position...".format(err)
+                text = "Caught ValueError: {}\nSearching for interpolated funcs for current position...".format(err)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 funcs = self._get_buffers_for_pos(pos)
-                if funcs:
+                while not funcs:
                     loudness_func, pitch_funcs, timbre_funcs, beat_func = funcs
-                else:
-                    text = "Killing visualization thread."
-                    print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
-                    exit(0)
+            # Unexpected error...retry
+            except:
+                text = "Unexpected error in visualization thread...retrying..."
+                print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
 
             self.pos_lock.acquire()
             self.playback_pos += sample_rate
