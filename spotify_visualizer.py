@@ -400,7 +400,11 @@ class SpotifyVisualizer:
             beat_dur = self.beats[i]["duration"]
             beat_conf = self.beats[i]["confidence"]
             beat_times.append(beat_time)
-            self.beat_info[beat_time] = (beat_dur, beat_conf, False)
+            self.beat_info[beat_time] = {
+                "duration": beat_dur,
+                "confidence": beat_conf,
+                "visualization_initiated": False
+            }
             # If we've analyzed chunk_length seconds of data, and there is more than 2 beats remaining, break
             if self.beats[i]["start"] > b_chunk_start + chunk_length and i < len(self.beats) - 1:
                 break
@@ -515,7 +519,10 @@ class SpotifyVisualizer:
         """
         # Get data for the most recent beat
         prev_beat_start = np.asscalar(beat_func(pos))
-        beat_dur, beat_conf, should_visualize = self.beat_info[prev_beat_start]
+        prev_beat_info = self.beat_info[prev_beat_start]
+        beat_dur = prev_beat_info["duration"]
+        beat_conf = prev_beat_info["confidence"]
+        visualization_initiated = prev_beat_info["visualization_initiated"]
 
         # Get normalized loudness value for current playback position
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
@@ -529,9 +536,9 @@ class SpotifyVisualizer:
 
         # Visualize beat if the confidence is ok and loudness is high (continue visualizing a beat if already started)
         brightness = 50
-        if (beat_conf > 0.4 and norm_loudness > 0.9) or should_visualize:
-            if not should_visualize:
-                self.beat_info[prev_beat_start][2] = True
+        if (beat_conf > 0.4 and norm_loudness > 0.9) or visualization_initiated:
+            if not visualization_initiated:
+                self.beat_info[prev_beat_start]["visualization_initiated"] = True
             time_elapsed = pos - prev_beat_start
             multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
             brightness = 50 + (50 * multiplier)
