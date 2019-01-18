@@ -511,20 +511,23 @@ class SpotifyVisualizer:
             pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
             timbre_funcs (list): a list of interpolated timbre functions (one timbre function for each basis function).
             beat_func (interp1d): interpolated beat start time function.
+            pos (float): the current playback position (offset into the track in seconds).
         """
-        # Normalize loudness
-        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
-        print("%f: %f" % (pos, norm_loudness))
+        # Get data for the most recent beat
         prev_beat_start = np.asscalar(beat_func(pos))
         beat_dur, beat_conf, should_visualize = self.beat_info[prev_beat_start]
 
-        # Determine how many pixels to light (growing from center of strip) based on loudness
+        # Get normalized loudness value for current playback position
+        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
+        print("%f: %f" % (pos, norm_loudness))
+
+        # Determine how many pixels to light (growing from center of strip) based on normalized loudness
         mid = self.num_pixels // 2
         length = int(self.num_pixels * norm_loudness)
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
 
-        # Visualize beats of reasonable confidence if loudness is high (continue visualizing a beat if already started)
+        # Visualize beat if the confidence is ok and loudness is high (continue visualizing a beat if already started)
         brightness = 50
         if (beat_conf > 0.4 and norm_loudness > 0.9) or should_visualize:
             if not should_visualize:
@@ -533,34 +536,30 @@ class SpotifyVisualizer:
             multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
             brightness = 50 + (50 * multiplier)
 
-        # Segment strip into 12 zones (1 zone for each of the 12 pitch keys) and determine zone color by pitch strength
+        # Set middle pixel to start_color (when an odd number of pixels are lit, segments don't cover the middle pixel)
+        start_r, start_g, start_b = self.start_color
+        self.strip.set_pixel(mid, start_r, start_g, start_b, brightness)
+
+        # Segment strip into 12 zones (1 for each of the pitch keys) and set color based on corresponding pitch strength
         for i in range(0, 12):
             pitch_strength = pitch_funcs[i](pos)
-            if i in range(6):
-                start = lower + (i * length // 12)
-                end = lower + ((i + 1) * length // 12)
-            else:
-                start = upper - ((11 - i + 1) * length // 12)
-                end = upper - ((11 - i) * length // 12)
+            start = lower + (i * length // 12) if i in range(6) else upper - ((11 - i + 1) * length // 12)
+            end = lower + ((i + 1) * length // 12) if i in range(6) else upper - ((11 - i) * length // 12)
             segment_len = end - start
             segment_mid = start + (segment_len // 2)
 
-            # Set middle pixel to always be start_color (if odd number of pixels, segments don't cover middle pixel)
-            start_r, start_g, start_b = self.start_color
-            self.strip.set_pixel(mid, start_r, start_g, start_b, brightness)
-
-            # Get the appropriate RGB color based on the current pitch zone and pitch strength
-            r, g, b = self._calculate_zone_color(pitch_strength, i)
+            # Get the appropriate color based on the current pitch zone and pitch strength
+            zone_r, zone_g, zone_b = self._calculate_zone_color(pitch_strength, i)
 
             # Fade the strength of the RGB values near the ends of the zone to produce a nice gradient effect
             for j in range(start, end + 1):
                 color_strength = (1.0 + (j - start)) / (1.0 + (segment_mid - start))
                 if color_strength > 1.0:
                     color_strength = 2.0 - color_strength
-                faded_r, faded_g, faded_b = self._apply_gradient_fade(r, g, b, color_strength)
+                faded_r, faded_g, faded_b = self._apply_gradient_fade(zone_r, zone_g, zone_b, color_strength)
                 self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
 
-        # Make sure to clear ends of the strip that are not in use and update strip
+        # Make sure to turn off pixels that are not in use and push visualization to the strip
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
