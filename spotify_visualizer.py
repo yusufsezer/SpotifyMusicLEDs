@@ -90,7 +90,7 @@ class SpotifyVisualizer:
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=30, mosi=10, sclk=11, order='rgb')
+        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
         self.track = None
         self.track_duration = None
 
@@ -400,11 +400,7 @@ class SpotifyVisualizer:
             beat_dur = self.beats[i]["duration"]
             beat_conf = self.beats[i]["confidence"]
             beat_times.append(beat_time)
-            self.beat_info[beat_time] = {
-                "duration": beat_dur,
-                "confidence": beat_conf,
-                "visualization_initiated": False
-            }
+            self.beat_info[beat_time] = (beat_dur, beat_conf, False)
             # If we've analyzed chunk_length seconds of data, and there is more than 2 beats remaining, break
             if self.beats[i]["start"] > b_chunk_start + chunk_length and i < len(self.beats) - 1:
                 break
@@ -426,7 +422,7 @@ class SpotifyVisualizer:
                 interp1d(
                     start_times,
                     [pitch_list[i] if pitch_list[i] >= 0 else 0 for pitch_list in pitch_lists],
-                    kind="linear",
+                    kind="cubic",
                     assume_sorted=True
                 )
             )
@@ -519,10 +515,7 @@ class SpotifyVisualizer:
         """
         # Get data for the most recent beat
         prev_beat_start = np.asscalar(beat_func(pos))
-        prev_beat_info = self.beat_info[prev_beat_start]
-        beat_dur = prev_beat_info["duration"]
-        beat_conf = prev_beat_info["confidence"]
-        visualization_initiated = prev_beat_info["visualization_initiated"]
+        beat_dur, beat_conf, visualization_initiated = self.beat_info[prev_beat_start]
 
         # Get normalized loudness value for current playback position
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
@@ -533,15 +526,19 @@ class SpotifyVisualizer:
         length = int(self.num_pixels * norm_loudness)
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
-
+        
+        # Save the current start_color (will need to restore this value after pushing visual to strip)
+        save_r, save_g, save_b = self.start_color
+        
         # Visualize beat if the confidence is ok and loudness is high (continue visualizing a beat if already started)
-        brightness = 50
-        if (beat_conf > 0.4 and norm_loudness > 0.9) or visualization_initiated:
+        brightness = 100
+        if beat_conf > 0.7 or visualization_initiated:
             if not visualization_initiated:
-                self.beat_info[prev_beat_start]["visualization_initiated"] = True
+                self.beat_info[prev_beat_start] = (beat_dur, beat_conf, True)
             time_elapsed = pos - prev_beat_start
-            multiplier = np.sqrt(-1 * (time_elapsed / beat_dur)**2 + 1) if beat_dur != 0 else 0
-            brightness = 50 + (50 * multiplier)
+            multiplier = 1.0 - (time_elapsed / beat_dur) if beat_dur != 0 else 0
+            beat_r, beat_g, beat_b = self._apply_gradient_fade(255, 0, 255, multiplier)
+            self.start_color = (beat_r, beat_g, beat_b)
 
         # Set middle pixel to start_color (when an odd number of pixels are lit, segments don't cover the middle pixel)
         start_r, start_g, start_b = self.start_color
@@ -570,6 +567,9 @@ class SpotifyVisualizer:
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
+        
+        # Restore original start_color
+        self.start_color = (save_r, save_g, save_b)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
