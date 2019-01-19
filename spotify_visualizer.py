@@ -610,7 +610,7 @@ class SpotifyVisualizer:
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 funcs = self._get_buffers_for_pos(pos)
                 while not funcs:
-                    loudness_func, pitch_funcs, timbre_funcs, beat_func = funcs
+                    loudness_func, pitch_funcs, timbre_funcs, beat_func = self._get_buffers_for_pos(pos)
             # Unexpected error...retry
             except:
                 text = "Unexpected error in visualization thread...retrying..."
