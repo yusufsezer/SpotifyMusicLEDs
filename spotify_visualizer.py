@@ -297,7 +297,7 @@ class SpotifyVisualizer:
                 start = mid + 1
 
         to_return = None
-        if index:
+        if index is not None:
             to_return = (
                 self.interpolated_loudness_buffer[index][-1],
                 self.interpolated_pitch_buffer[index][-1],
