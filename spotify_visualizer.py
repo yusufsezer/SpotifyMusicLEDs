@@ -40,7 +40,6 @@ class SpotifyVisualizer:
             end_colors (dict): a dict of 12 RGB 3-tuples; map pitch zone indices to the end-gradient-color for the zone.
             interpolated_loudness_buffer (list): producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): producer-consumer buffer holding lists of interpolated pitch functions.
-            interpolated_timbre_buffer (list): producer-consumer buffer holding lists of interpolated timbre functions.
             num_pixels (int): the number of pixels (LEDs) on the LED strip.
             permission_scopes (str): a space-separated str of the required permission scopes over the user's account.
             playback_pos (float): the current playback position (offset into track in seconds) of the visualization.
@@ -76,7 +75,6 @@ class SpotifyVisualizer:
         }
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
-        self.interpolated_timbre_buffer = []
         self.num_pixels = num_pixels
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
@@ -281,11 +279,11 @@ class SpotifyVisualizer:
             pos (float): the playback position to find interpolated functions for.
 
         Returns:
-             a 3-tuple of interp1d objects (loudness, pitch and timbre functions) or None if search fails.
+             a tuple of interp1d objects (loudness and pitch functions) or None if search fails.
         """
         self.buffer_lock.acquire()
 
-        # Binary search for interpolated loudness, pitch and timbre functions
+        # Binary search for interpolated loudness and pitch functions
         start, end, index = 0, len(self.interpolated_loudness_buffer) - 1, None
         while start <= end:
             mid = start + (end - start) // 2
@@ -303,7 +301,6 @@ class SpotifyVisualizer:
             to_return = (
                 self.interpolated_loudness_buffer[index][-1],
                 self.interpolated_pitch_buffer[index][-1],
-                self.interpolated_timbre_buffer[index][-1]
             )
         self.buffer_lock.release()
         return to_return
@@ -312,7 +309,7 @@ class SpotifyVisualizer:
         """Obtain track data from the Spotify API and run necessary analysis to generate data needed for visualization.
 
         Each call to this function analyzes the next chunk_length seconds of track data and produces the appropriate
-        interpolated loudness, pitch and timbre functions. These interpolated functions are added to their
+        interpolated loudness and pitch functions. These interpolated functions are added to their
         corresponding buffers.
 
         Args:
@@ -325,28 +322,25 @@ class SpotifyVisualizer:
                 {
                     "start": -0.1,
                     "loudness_start": -25.0,
-                    "pitches": 12*[0],
-                    "timbre": 12*[0]
+                    "pitches": 12*[0]
                 }
             )
             self.data_segments += analysis["segments"]
             self.data_segments.append(
                 {
                     "start": self.track_duration + 0.1,
-                    "loudness_start": -25.0, "pitches": 12*[0],
-                    "timbre": 12*[0]
+                    "loudness_start": -25.0, "pitches": 12*[0]
                 }
             )
 
-        # Extract the next chunk_length seconds of useful loudness, pitch and timbre data
-        s_t, l, pitch_lists, timbre_lists = [], [], [], []
+        # Extract the next chunk_length seconds of useful loudness and pitch data
+        s_t, l, pitch_lists = [], [], []
         i = 0
         chunk_start = self.data_segments[0]["start"]
         while i < len(self.data_segments):
             s_t.append(self.data_segments[i]["start"])
             l.append(self.data_segments[i]["loudness_start"])
             pitch_lists.append(self.data_segments[i]["pitches"])
-            timbre_lists.append(self.data_segments[i]["timbre"])
             # If we've analyzed chunk_length seconds of data, and there is more than 2 segments remaining, break
             if self.data_segments[i]["start"] > chunk_start + chunk_length and i < len(self.data_segments) - 1:
                 break
@@ -356,11 +350,11 @@ class SpotifyVisualizer:
         # Discard data segments that were just analyzed
         self.data_segments = self.data_segments[i:]
 
-        # Perform data interpolation for loudness, pitch, and timbre data
+        # Perform data interpolation for loudness and pitch data
         start_times = np.array(s_t)
         loudnesses = np.array(l)
         interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
-        interpolated_pitch_funcs, interpolated_timbre_funcs = [], []
+        interpolated_pitch_funcs = []
         for i in range(12):
             # Create a separate interpolated pitch function for each of the 12 elements of the pitch vectors
             interpolated_pitch_funcs.append(
@@ -371,31 +365,20 @@ class SpotifyVisualizer:
                     assume_sorted=True
                 )
             )
-            # Create a separate interpolated timbre function for each of the 12 elements of the timbre vectors
-            interpolated_timbre_funcs.append(
-                interp1d(
-                    start_times,
-                    [timbre_list[i] for timbre_list in timbre_lists],
-                    kind="linear",
-                    assume_sorted=True
-                )
-            )
 
         # Add interpolated functions and their bounds to buffers for consumption by visualization thread
         self.buffer_lock.acquire()
         self.interpolated_loudness_buffer.append((chunk_start, chunk_end, interpolated_loudness_func))
         self.interpolated_pitch_buffer.append((chunk_start, chunk_end, interpolated_pitch_funcs))
-        self.interpolated_timbre_buffer.append((chunk_start, chunk_end, interpolated_timbre_funcs))
 
         # Print information about the data chunk load that was just performed
         title = "--------------------DATA LOAD REPORT--------------------\n"
         data_seg = "Data segments remaining: {}.\n".format(len(self.data_segments))
         loudness = "Interpolated loudness buffer size: {}.\n".format(len(self.interpolated_loudness_buffer))
         pitch = "Interpolated pitch buffer size: {}.\n".format(len(self.interpolated_pitch_buffer))
-        timbre = "Interpolated timbre buffer size: {}.\n".format(len(self.interpolated_timbre_buffer))
         closer = "--------------------------------------------------------"
         self.buffer_lock.release()
-        text = title + data_seg + loudness + pitch + timbre + closer
+        text = title + data_seg + loudness + pitch + closer
         print(SpotifyVisualizer._make_text_effect(text, ["blue"]))
 
     @staticmethod
@@ -445,13 +428,12 @@ class SpotifyVisualizer:
         range_size = range_max - range_min
         return (loudness - range_min) / range_size
 
-    def _push_visual_to_strip(self, loudness_func, pitch_funcs, timbre_funcs, pos):
-        """Displays a visual on the LED strip based on the loudness, pitches and timbre at current playback position.
+    def _push_visual_to_strip(self, loudness_func, pitch_funcs, pos):
+        """Displays a visual on the LED strip based on the loudness and pitch data at current playback position.
 
         Args:
             loudness_func (interp1d): interpolated loudness function.
             pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
-            timbre_funcs (list): a list of interpolated timbre functions (one timbre function for each basis function).
             pos (float): the current playback position (offset into the track in seconds).
         """
         # Get normalized loudness value for current playback position
@@ -499,7 +481,6 @@ class SpotifyVisualizer:
         self.data_segments = []
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
-        self.interpolated_timbre_buffer = []
         self.playback_pos = 0
         self.should_terminate = False
         self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
@@ -524,7 +505,7 @@ class SpotifyVisualizer:
             sample_rate (float): how long to wait (in seconds) between each sample.
         """
         pos = self.playback_pos
-        loudness_func, pitch_funcs, timbre_funcs = self._get_buffers_for_pos(pos)
+        loudness_func, pitch_funcs = self._get_buffers_for_pos(pos)
 
         try:
             if not self.sp_vis.current_playback()["is_playing"]:
@@ -542,14 +523,14 @@ class SpotifyVisualizer:
 
             try:
                 pos = self.playback_pos
-                self._push_visual_to_strip(loudness_func, pitch_funcs, timbre_funcs, pos)
+                self._push_visual_to_strip(loudness_func, pitch_funcs, pos)
             # If pitch or loudness value out of range, find the interpolated functions for the current position
             except ValueError as err:
                 text = "Caught ValueError: {}\nSearching for interpolated funcs for current position...".format(err)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 funcs = self._get_buffers_for_pos(pos)
                 if funcs:
-                    loudness_func, pitch_funcs, timbre_funcs = funcs
+                    loudness_func, pitch_funcs = funcs
             # Unexpected error...retry
             except:
                 text = "Unexpected error in visualization thread...retrying..."
