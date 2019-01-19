@@ -550,9 +550,6 @@ class SpotifyVisualizer:
         self.strip.fill(0, lower, 0, 0, 0, 0)
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
-        
-        # Restore original start_color
-        self.start_color = (save_r, save_g, save_b)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
@@ -609,8 +606,8 @@ class SpotifyVisualizer:
                 text = "Caught ValueError: {}\nSearching for interpolated funcs for current position...".format(err)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 funcs = self._get_buffers_for_pos(pos)
-                while not funcs:
-                    loudness_func, pitch_funcs, timbre_funcs, beat_func = self._get_buffers_for_pos(pos)
+                if funcs:
+                    loudness_func, pitch_funcs, timbre_funcs, beat_func = funcs
             # Unexpected error...retry
             except:
                 text = "Unexpected error in visualization thread...retrying..."
