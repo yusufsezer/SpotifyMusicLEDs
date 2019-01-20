@@ -11,15 +11,16 @@ __author__ = "Yusuf Sezer"
 
 
 class SpotifyVisualizer:
-    """A class that allows for multi-threaded music visualization via the Spotify API, a Raspberry Pi, and an LED strip.
+    """A class that allows for multi-threaded music visualization via the Spotify API, a Raspberry Pi, and an LED
+    strip.
 
-    This class allows for multi-threaded music visualization via the Spotify API and an APA102 LED strip. This code was
-    developed and tested using a 240-pixel (4 meter) Adafruit Dotstar LED strip, a Raspberry Pi 3 Model B and my
-    personal Spotify account. After initializing an instance of this class, simply call visualize() to begin
+    This code was developed and tested using a 240-pixel (4 meter) Adafruit Dotstar LED strip, a Raspberry Pi 3 Model B
+    and my personal Spotify account. After initializing an instance of this class, simply call visualize() to begin
     visualization (alternatively, simply run this module). Visualization will continue until the program is interrupted
     or terminated. There are 4 threads: one for visualization, one for periodically syncing the playback position with
     the Spotify API, one for loading chunks of track data, and one to periodically check if the user's current track has
     changed.
+
     Currently, loudness and pitch data are used to generate and display visualizations on the LED strip. Loudness is
     used to determine how many pixels to light (growing from the center of the strip towards the ends). At any given
     moment, the lit part of the strip is segmented into 12 equal-length zones (one zone for each of the 12 major pitch
