@@ -1,4 +1,3 @@
-# !/usr/bin/env python3
 import apa102
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 import numpy as np
@@ -7,7 +6,8 @@ import spotipy
 import spotipy.util as util
 import threading
 import time
-import sys
+
+__author__ = "Yusuf Sezer"
 
 
 class SpotifyVisualizer:
@@ -22,7 +22,7 @@ class SpotifyVisualizer:
     changed.
     Currently, loudness and pitch data are used to generate and display visualizations on the LED strip. Loudness is
     used to determine how many pixels to light (growing from the center of the strip towards the ends). At any given
-    moment, the number of lit pixels is segmented into 12 equal-length zones (one zone for each of the 12 major pitch
+    moment, the lit part of the strip is segmented into 12 equal-length zones (one zone for each of the 12 major pitch
     keys). Each zone fades from start_color to its corresponding end color in end_colors. If the pitch key corresponding
     to a zone is very strong (high presence), that zone will be set to its end color. If the pitch key corresponding to
     a zone is very weak, then the zone will be set to start_color. If the pitch key corresponding to a zone is of
@@ -35,13 +35,13 @@ class SpotifyVisualizer:
         num_pixels (int): The number of pixels (LEDs) supported by the LED strip.
 
     Attributes:
-            buffer_lock (threading.Lock): a lock for accessing/modifying the buffers of interpolated functions.
-            data_segments (list): data segments to be parsed and interpreted (fetched from Spotify API).
-            end_colors (dict): a dict of 12 RGB 3-tuples; map pitch zone indices to the end-gradient-color for the zone.
+            buffer_lock (threading.Lock): a lock for accessing/modifying the interpolated function buffers.
+            data_segments (list): data segments to be parsed and analyzed (fetched from Spotify API).
+            end_colors (dict): a dict of 12 RGB 3-tuples; maps pitch zone indices to the end-gradient-color of the zone.
             interpolated_loudness_buffer (list): producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): producer-consumer buffer holding lists of interpolated pitch functions.
             num_pixels (int): the number of pixels (LEDs) on the LED strip.
-            permission_scopes (str): a space-separated str of the required permission scopes over the user's account.
+            permission_scopes (str): a space-separated string of the required permission scopes over the user's account.
             playback_pos (float): the current playback position (offset into track in seconds) of the visualization.
             pos_lock (threading.Lock): a lock for accessing/modifying playback_pos.
             should_terminate (bool): a variable watched by all child threads (child threads exit if set to True).
@@ -87,7 +87,7 @@ class SpotifyVisualizer:
         self.track_duration = None
 
     def authorize(self):
-        """Handle the authorization workflow for the Spotify API
+        """Handle the authorization workflow for the Spotify API.
         """
         token = util.prompt_for_user_token(USERNAME,
                                            self.permission_scopes,
@@ -167,13 +167,13 @@ class SpotifyVisualizer:
         results in the same RGB color that was passed (no fade is applied).
 
         Args:
-             r (int): represents the red value (in range [0, 0xFF]) of the RGB color to fade.
-             b (int): represents the blue value (in range [0, 0xFF]) of the RGB color to fade.
-             g (int): represents the green value (in range [0, 0xFF]) of the RGB color to fade.
+             r (int): represents the red value (in range [0, 255]) of the RGB color to fade.
+             b (int): represents the blue value (in range [0, 255]) of the RGB color to fade.
+             g (int): represents the green value (in range [0, 255]) of the RGB color to fade.
              strength (float): a strength value representing how strong the RGB color should be (in range [0.0, 1.0]).
 
         Returns:
-            a 3-tuple of ints representing the RGB value with fade applied.
+            a 3-tuple of ints representing the new faded RGB value.
         """
         start_r, start_g, start_b = self.start_color
         r_diff, g_diff, b_diff = r - start_r, g - start_g, b - start_b
@@ -341,6 +341,7 @@ class SpotifyVisualizer:
             s_t.append(self.data_segments[i]["start"])
             l.append(self.data_segments[i]["loudness_start"])
             pitch_lists.append(self.data_segments[i]["pitches"])
+
             # If we've analyzed chunk_length seconds of data, and there is more than 2 segments remaining, break
             if self.data_segments[i]["start"] > chunk_start + chunk_length and i < len(self.data_segments) - 1:
                 break
@@ -356,7 +357,7 @@ class SpotifyVisualizer:
         interpolated_loudness_func = interp1d(start_times, loudnesses, kind='cubic', assume_sorted=True)
         interpolated_pitch_funcs = []
         for i in range(12):
-            # Create a separate interpolated pitch function for each of the 12 elements of the pitch vectors
+            # Create a separate interpolated pitch function for each of the 12 pitch keys
             interpolated_pitch_funcs.append(
                 interp1d(
                     start_times,
@@ -440,12 +441,12 @@ class SpotifyVisualizer:
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
         print("%f: %f" % (pos, norm_loudness))
 
-        # Determine how many pixels to light (growing from center of strip) based on normalized loudness
-        brightness = 100
+        # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
         mid = self.num_pixels // 2
         length = int(self.num_pixels * norm_loudness)
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
+        brightness = 100
 
         # Set middle pixel to start_color (when an odd number of pixels are lit, segments don't cover the middle pixel)
         start_r, start_g, start_b = self.start_color
@@ -540,6 +541,7 @@ class SpotifyVisualizer:
             self.playback_pos += sample_rate
             self.pos_lock.release()
             end = time.perf_counter()
+
             # Account for time used to create visualization
             diff = sample_rate - (end - start)
             time.sleep(diff if diff > 0 else 0)
