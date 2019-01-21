@@ -447,6 +447,7 @@ class SpotifyVisualizer:
         """
         # Get normalized loudness value for current playback position
         norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
+        norm_loudness = min(1, max(0, np.power(norm_loudness + 0.1, 1.7) - 0.1))
         print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
