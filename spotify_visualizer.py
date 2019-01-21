@@ -1,4 +1,4 @@
-visualize_only = True
+visualize_only = False
 if not visualize_only:
     import apa102
 else:
@@ -565,4 +565,4 @@ if __name__ == "__main__":
         v.start_visualization()
     else:
         spotify_visualizer = SpotifyVisualizer(240)
-        spotify_visualizer.visualize
+        spotify_visualizer.visualize()
