@@ -1,11 +1,9 @@
 from PyQt5.QtWidgets import QWidget, QApplication
-from PyQt5.QtGui import QPainter, QColor, QImage, QPixmap
-from PyQt5.QtCore import Qt
-import sys, random
-import time
+from PyQt5.QtGui import QPainter, QColor
+import sys
 
-class Visualization():
 
+class Visualization:
     def __init__(self):
         self.vw = None
 
@@ -30,15 +28,12 @@ class Visualization():
         self.vw.fill(start, end, r, g, b, brightness)
 
 
-
 class VisualizationWidget(QWidget):
-
     def __init__(self):
         self.num_pixels = 241
         self.pixels = [QColor(0, 0, 0) for _ in range(self.num_pixels)]
         super().__init__()
         self.initUI()
-
 
     def initUI(self):
 
@@ -68,8 +63,3 @@ class VisualizationWidget(QWidget):
     def fill(self, start, end, r, g, b, brightness=0):
         for i in range(end-start+1):
             self.set_pixel(start+i, r, g, b, brightness)
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = Visualization()
-    sys.exit(app.exec_())
