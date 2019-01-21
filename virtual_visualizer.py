@@ -38,7 +38,7 @@ class VisualizationWidget(QWidget):
     def initUI(self):
 
         self.setGeometry(10, 10, 5*self.num_pixels, 20)
-        self.setWindowTitle('Points')
+        self.setWindowTitle('Spotify Virtual Visualizer')
         super().show()
 
     def paintEvent(self, e):

@@ -1,15 +1,13 @@
-visualize_only = False
+visualize_only = True
 if not visualize_only:
     import apa102
 else:
-    from visualizer import Visualization
+    from virtual_visualizer import Visualization
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 import numpy as np
-from PyQt5.QtWidgets import QWidget, QApplication
 from scipy.interpolate import interp1d
 import spotipy
 import spotipy.util as util
-import sys
 import threading
 import time
 
