@@ -1,9 +1,15 @@
-import apa102
+visualize_only = False
+if not visualize_only:
+    import apa102
+else:
+    from visualizer import Visualization
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 import numpy as np
+from PyQt5.QtWidgets import QWidget, QApplication
 from scipy.interpolate import interp1d
 import spotipy
 import spotipy.util as util
+import sys
 import threading
 import time
 
@@ -57,7 +63,7 @@ class SpotifyVisualizer:
             track_duration (float): the duration in seconds of the track that is being visualized.
     """
 
-    def __init__(self, num_pixels):
+    def __init__(self, num_pixels, visualize_only=False, visualizer_obj=None):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
@@ -83,7 +89,10 @@ class SpotifyVisualizer:
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        self.strip = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
+        if not visualize_only:
+            self.strip = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
+        else:
+            self.strip = visualizer_obj
         self.track = None
         self.track_duration = None
 
@@ -550,5 +559,12 @@ class SpotifyVisualizer:
 
 if __name__ == "__main__":
     # Instantiate an instance of SpotifyVisualizer and start visualization
-    visualizer = SpotifyVisualizer(240)
-    visualizer.visualize()
+    if visualize_only:
+        v = Visualization()
+        spotify_visualizer = SpotifyVisualizer(240, visualize_only, v)
+        t = threading.Thread(target=spotify_visualizer.visualize)
+        t.start()
+        v.start_visualization()
+    else:
+        spotify_visualizer = SpotifyVisualizer(240)
+        spotify_visualizer.visualize
