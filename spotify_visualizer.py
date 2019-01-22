@@ -12,9 +12,9 @@ __author__ = "Yusuf Sezer"
 
 class SpotifyVisualizer:
     """A class that allows for multi-threaded music visualization via the Spotify API, a Raspberry Pi, and an LED
-    strip.
+    strip. When invoked in developer mode, a virtual LED strip will be opened in a new window!
 
-    This code was developed and tested using a 240-pixel (4 meter) Adafruit Dotstar LED strip, a Raspberry Pi 3 Model B
+    This code was developed and tested on a 240-pixel (4 meter) Adafruit Dotstar LED strip, a Raspberry Pi 3 Model B
     and my personal Spotify account. After initializing an instance of this class, simply call visualize() to begin
     visualization (alternatively, simply run this module). Visualization will continue until the program is interrupted
     or terminated. There are 4 threads: one for visualization, one for periodically syncing the playback position with
@@ -31,6 +31,11 @@ class SpotifyVisualizer:
     Additionally, A fade effect is applied to the ends of each zone; the color of the middle pixel of a zone will be set
     purely based on the strength of the corresponding pitch. Pixels towards the end of each zone, however, will fade
     back towards start_color.
+
+    Usage:
+        python3 spotify_visualizer.py
+    Developer mode:
+        python3 spotify_visualizer.py True
 
     Args:
         num_pixels (int): The number of pixels (LEDs) supported by the LED strip.
@@ -57,7 +62,7 @@ class SpotifyVisualizer:
             track_duration (float): the duration in seconds of the track that is being visualized.
     """
 
-    def __init__(self, num_pixels, visualization_device):
+    def __init__(self, num_pixels, device):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
@@ -83,7 +88,7 @@ class SpotifyVisualizer:
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        self.strip = visualization_device
+        self.strip = device
         self.track = None
         self.track_duration = None
 
@@ -557,7 +562,7 @@ if __name__ == "__main__":
     else:
         developer_mode = False
 
-    num_pixels = 240
+    n_pixels = 240
     # Instantiate the appropriate visualizer device based on the development_mode setting
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
@@ -566,8 +571,8 @@ if __name__ == "__main__":
         t.start()
     else:
         import apa102
-        visualization_device = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
+        visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
 
     # Instantiate an instance of SpotifyVisualizer and start visualization
-    spotify_visualizer = SpotifyVisualizer(num_pixels, visualization_device)
+    spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
     spotify_visualizer.visualize()
