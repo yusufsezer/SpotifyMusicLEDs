@@ -3,15 +3,9 @@ import numpy as np
 from scipy.interpolate import interp1d
 import spotipy
 import spotipy.util as util
+import sys
 import threading
 import time
-
-# import the appropriate visualization device object based on developer mode setting
-developer_mode = True
-if not developer_mode:
-    import apa102
-else:
-    from virtual_visualizer import VirtualVisualizer
 
 __author__ = "Yusuf Sezer"
 
@@ -555,15 +549,23 @@ class SpotifyVisualizer:
 
 
 if __name__ == "__main__":
-    num_pixels = 240
+    args = sys.argv
 
+    # If developer mode option is specified, update setting; if not, default to False
+    if len(args) > 1:
+        developer_mode = bool(args[1])
+    else:
+        developer_mode = False
+
+    num_pixels = 240
+    # Instantiate the appropriate visualizer device based on the development_mode setting
     if developer_mode:
-        # Instantiate and start a VirtualVisualizer for development and testing purposes
+        from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
         t = threading.Thread(target=visualization_device.start_visualization)
         t.start()
     else:
-        # Instantiate an instance of APA102 to drive a physical LED strip
+        import apa102
         visualization_device = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
 
     # Instantiate an instance of SpotifyVisualizer and start visualization
