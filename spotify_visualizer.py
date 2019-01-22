@@ -1,8 +1,3 @@
-visualize_only = False
-if not visualize_only:
-    import apa102
-else:
-    from virtual_visualizer import Visualization
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
 import numpy as np
 from scipy.interpolate import interp1d
@@ -10,6 +5,13 @@ import spotipy
 import spotipy.util as util
 import threading
 import time
+
+# import the appropriate visualization device object based on developer mode setting
+developer_mode = True
+if not developer_mode:
+    import apa102
+else:
+    from virtual_visualizer import VirtualVisualizer
 
 __author__ = "Yusuf Sezer"
 
@@ -61,7 +63,7 @@ class SpotifyVisualizer:
             track_duration (float): the duration in seconds of the track that is being visualized.
     """
 
-    def __init__(self, num_pixels, visualize_only=False, visualizer_obj=None):
+    def __init__(self, num_pixels, visualization_device):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
@@ -87,10 +89,7 @@ class SpotifyVisualizer:
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        if not visualize_only:
-            self.strip = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
-        else:
-            self.strip = visualizer_obj
+        self.strip = visualization_device
         self.track = None
         self.track_duration = None
 
@@ -556,13 +555,17 @@ class SpotifyVisualizer:
 
 
 if __name__ == "__main__":
-    # Instantiate an instance of SpotifyVisualizer and start visualization
-    if visualize_only:
-        v = Visualization()
-        spotify_visualizer = SpotifyVisualizer(240, visualize_only, v)
-        t = threading.Thread(target=spotify_visualizer.visualize)
+    num_pixels = 240
+
+    if developer_mode:
+        # Instantiate and start a VirtualVisualizer for development and testing purposes
+        visualization_device = VirtualVisualizer()
+        t = threading.Thread(target=visualization_device.start_visualization)
         t.start()
-        v.start_visualization()
     else:
-        spotify_visualizer = SpotifyVisualizer(240)
-        spotify_visualizer.visualize()
+        # Instantiate an instance of APA102 to drive a physical LED strip
+        visualization_device = apa102.APA102(num_led=num_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
+
+    # Instantiate an instance of SpotifyVisualizer and start visualization
+    spotify_visualizer = SpotifyVisualizer(num_pixels, visualization_device)
+    spotify_visualizer.visualize()
