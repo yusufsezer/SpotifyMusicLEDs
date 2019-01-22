@@ -563,7 +563,7 @@ if __name__ == "__main__":
         developer_mode = False
 
     n_pixels = 240
-    # Instantiate the appropriate visualizer device based on the development_mode setting
+    # Instantiate the appropriate visualizer device based on the developer mode setting
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
