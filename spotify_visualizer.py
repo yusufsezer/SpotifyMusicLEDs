@@ -1,4 +1,6 @@
-from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI
+import boto3 as AWS
+from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI, AWS_ACCESS_KEY,\
+    AWS_SECRET_KEY
 import numpy as np
 from scipy.interpolate import interp1d
 import spotipy
@@ -64,7 +66,7 @@ class SpotifyVisualizer:
             track_duration (float): the duration in seconds of the track that is being visualized.
     """
 
-    def __init__(self, num_pixels, device):
+    def __init__(self, num_pixels, device, start_color = (0, 0, 255)):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.end_colors = {
@@ -89,7 +91,7 @@ class SpotifyVisualizer:
         self.pos_lock = threading.Lock()
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
-        self.start_color = (0, 0, 255)
+        self.start_color = start_color
         self.strip = device
         self.track = None
         self.track_duration = None
@@ -447,8 +449,29 @@ class SpotifyVisualizer:
 
 
 if __name__ == "__main__":
-    args = sys.argv
+    # Load settings
+    client = AWS.client(
+        'dynamodb',
+        region_name='us-east-1',
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY
+    )
+    settings = client.get_item(
+        TableName="SpotifyVisualizerUsers",
+        Key={
+            'user_id': {
+                'S': 'Yusuf'
+            }
+        }
+    )['Item']['settings']['M']
+
+    base_color_r = int(settings['baseColorRedValue']['N'])
+    base_color_g = int(settings['baseColorGreenValue']['N'])
+    base_color_b = int(settings['baseColorBlueValue']['N'])
+    base_color = (base_color_r, base_color_g, base_color_b)
+
     # If developer mode option is specified, update setting; if not, default to False
+    args = sys.argv
     if len(args) > 1:
         developer_mode = bool(args[1])
     else:
@@ -459,12 +482,14 @@ if __name__ == "__main__":
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
-        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
+        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device, base_color)
         t = threading.Thread(target=spotify_visualizer.launch_visualizer)
         t.start()
         visualization_device.start_visualization()
     else:
         import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
-        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
-        spotify_visualizer.launch_visualizer()
+
+    # Instantiate an instance of SpotifyVisualizer and start visualization
+    spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device, base_color)
+    spotify_visualizer.launch_visualizer()
