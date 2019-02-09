@@ -567,12 +567,13 @@ if __name__ == "__main__":
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
-        t = threading.Thread(target=visualization_device.start_visualization)
+        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
+        t = threading.Thread(target=spotify_visualizer.visualize)
         t.start()
+        visualization_device.start_visualization()
     else:
         import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
-
+        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
+        spotify_visualizer.visualize()
     # Instantiate an instance of SpotifyVisualizer and start visualization
-    spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
-    spotify_visualizer.visualize()
