@@ -138,7 +138,7 @@ class SpotifyVisualizer:
         self.playback_pos = track_progress
         self.pos_lock.release()
 
-    def visualize(self):
+    def launch_visualizer(self):
         """Coordinate visualization by spawning the appropriate threads.
 
         There are 4 threads: one for visualization, one for periodically syncing the playback position with the Spotify
@@ -165,60 +165,6 @@ class SpotifyVisualizer:
                 thread.join()
             text = "Visualization finished."
             print(SpotifyVisualizer._make_text_effect(text, ["green"]))
-
-    def _apply_gradient_fade(self, r, g, b, strength):
-        """Fade the passed RGB value towards start_color based on strength
-
-        Note that a strength value of 0.0 results in the start color of the gradient, and a strength value of 1.0
-        results in the same RGB color that was passed (no fade is applied).
-
-        Args:
-             r (int): represents the red value (in range [0, 255]) of the RGB color to fade.
-             b (int): represents the blue value (in range [0, 255]) of the RGB color to fade.
-             g (int): represents the green value (in range [0, 255]) of the RGB color to fade.
-             strength (float): a strength value representing how strong the RGB color should be (in range [0.0, 1.0]).
-
-        Returns:
-            a 3-tuple of ints representing the new faded RGB value.
-        """
-        start_r, start_g, start_b = self.start_color
-        r_diff, g_diff, b_diff = r - start_r, g - start_g, b - start_b
-
-        faded_r = start_r + int(strength * r_diff)
-        faded_g = start_g + int(strength * g_diff)
-        faded_b = start_b + int(strength * b_diff)
-
-        return faded_r, faded_g, faded_b
-
-    def _calculate_zone_color(self, pitch_strength, zone_index):
-        """Calculate the color to visualize based on the pitch/zone index and corresponding pitch strength.
-
-        The visualizer divides the lit portion of the strip into 12 equal-length zones, one for each of the 12 major
-        pitch keys. This function calculates what color should be displayed in the zone specified by zone_index if the
-        corresponding pitch has strength pitch_strength (0.0 corresponds to lowest strength, 1.0 corresponds to maximum
-        strength).
-
-        Args:
-            pitch_strength (float): a value representing how strong or present the pitch is (normalized to [0.0, 1.0]).
-            zone_index (int): an index in range [0, 11] corresponding to the zone/pitch key.
-
-        Returns:
-            a 3-tuple of ints representing the RGB value that should be displayed in the zone specified by zone_index.
-        """
-        if pitch_strength < 0.0:
-            pitch_strength = 0.0
-        elif pitch_strength > 1.0:
-            pitch_strength = 1.0
-
-        start_r, start_g, start_b = self.start_color
-        end_r, end_g, end_b = self.end_colors[zone_index]
-        r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
-
-        r = start_r + int(pitch_strength * r_diff)
-        g = start_g + int(pitch_strength * g_diff)
-        b = start_b + int(pitch_strength * b_diff)
-
-        return r, g, b
 
     def _continue_checking_if_skip(self, wait=0.33):
         """Continuously checks if the user's playing track has changed. Called asynchronously (worker thread).
@@ -416,25 +362,6 @@ class SpotifyVisualizer:
         msg_with_fx += end_code * len(text_effects)
         return msg_with_fx
 
-    @staticmethod
-    def _normalize_loudness(loudness, range_min=-54.0, range_max=-4.0):
-        """Normalize a loudness value to the range specified.
-
-        Args:
-            loudness (float): the loudness value to normalize.
-            range_min (float): the lower bound of the range.
-            range_max (float): the upper bound of the range.
-
-        Returns:
-            the normalized loudness value (float between 0.0 and 1.0) for the specified range.
-        """
-        if loudness > range_max:
-            return 1.0
-        if loudness < range_min:
-            return 0.0
-        range_size = range_max - range_min
-        return (loudness - range_min) / range_size
-
     def _push_visual_to_strip(self, loudness_func, pitch_funcs, pos):
         """Displays a visual on the LED strip based on the loudness and pitch data at current playback position.
 
@@ -443,44 +370,7 @@ class SpotifyVisualizer:
             pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
             pos (float): the current playback position (offset into the track in seconds).
         """
-        # Get normalized loudness value for current playback position
-        norm_loudness = SpotifyVisualizer._normalize_loudness(loudness_func(pos))
-        print("%f: %f" % (pos, norm_loudness))
-
-        # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
-        mid = self.num_pixels // 2
-        length = int(self.num_pixels * norm_loudness)
-        lower = mid - round(length / 2)
-        upper = mid + round(length / 2)
-        brightness = 100
-
-        # Set middle pixel to start_color (when an odd number of pixels are lit, segments don't cover the middle pixel)
-        start_r, start_g, start_b = self.start_color
-        self.strip.set_pixel(mid, start_r, start_g, start_b, brightness)
-
-        # Segment strip into 12 zones (1 for each of the pitch keys) and set color based on corresponding pitch strength
-        for i in range(0, 12):
-            pitch_strength = pitch_funcs[i](pos)
-            start = lower + (i * length // 12) if i in range(6) else upper - ((11 - i + 1) * length // 12)
-            end = lower + ((i + 1) * length // 12) if i in range(6) else upper - ((11 - i) * length // 12)
-            segment_len = end - start
-            segment_mid = start + (segment_len // 2)
-
-            # Get the appropriate color based on the current pitch zone and pitch strength
-            zone_r, zone_g, zone_b = self._calculate_zone_color(pitch_strength, i)
-
-            # Fade the strength of the RGB values near the ends of the zone to produce a nice gradient effect
-            for j in range(start, end + 1):
-                color_strength = (1.0 + (j - start)) / (1.0 + (segment_mid - start))
-                if color_strength > 1.0:
-                    color_strength = 2.0 - color_strength
-                faded_r, faded_g, faded_b = self._apply_gradient_fade(zone_r, zone_g, zone_b, color_strength)
-                self.strip.set_pixel(j, faded_r, faded_g, faded_b, brightness)
-
-        # Make sure to turn off pixels that are not in use and push visualization to the strip
-        self.strip.fill(0, lower, 0, 0, 0, 0)
-        self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
-        self.strip.show()
+        LoudnessLengthWithPitchVisualizer.visualize(self.strip, self.num_pixels, loudness_func, pitch_funcs, pos)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
@@ -566,9 +456,10 @@ if __name__ == "__main__":
     # Instantiate the appropriate visualizer device based on the developer mode setting
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
+        from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
         visualization_device = VirtualVisualizer()
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
-        t = threading.Thread(target=spotify_visualizer.visualize)
+        t = threading.Thread(target=spotify_visualizer.launch_visualizer)
         t.start()
         visualization_device.start_visualization()
     else:
@@ -576,4 +467,3 @@ if __name__ == "__main__":
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
         spotify_visualizer.visualize()
-    # Instantiate an instance of SpotifyVisualizer and start visualization
