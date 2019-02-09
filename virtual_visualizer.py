@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QApplication
+from PyQt5.QtWidgets import QWidget, QApplication, QPushButton, QVBoxLayout
 from PyQt5.QtGui import QPainter, QColor
 import sys
 
@@ -72,14 +72,25 @@ class VisualizationWidget(QWidget):
     def __init__(self):
         self.num_pixels = 241
         self.pixels = [QColor(0, 0, 0) for _ in range(self.num_pixels)]
+        self.start_button = None
+        self.is_drop = False
         super().__init__()
         self.init_ui()
+
+    def handle_start_click(self):
+        self.is_drop = not self.is_drop
+        text = "Start Recording Data" if not self.is_drop else "Stop Recording Data"
+        self.start_button.setText(text)
 
     def init_ui(self):
         """Initialize and show the window representing the virtual LED strip.
         """
-        self.setGeometry(10, 10, 5*self.num_pixels, 20)
+        self.setGeometry(10, 10, 5*self.num_pixels, 80)
         self.setWindowTitle('Spotify Virtual Visualizer')
+        self.start_button = QPushButton('Start Recording', self)
+        self.start_button.clicked[bool].connect(self.handle_start_click)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.start_button)
         super().show()
 
     def paintEvent(self, e):
