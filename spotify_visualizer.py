@@ -181,7 +181,7 @@ class SpotifyVisualizer:
                 track = self.sp_skip.current_user_playing_track()
             except:
                 text = "Error occurred while checking if track has changed...retrying in {} seconds.".format(wait)
-                print(SpotifyVisualizer._make_text_effect(text, "red", "bold"))
+                print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
             time.sleep(wait)
         self.sp_skip.pause_playback()
         self.should_terminate = True
@@ -370,7 +370,7 @@ class SpotifyVisualizer:
             pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
             pos (float): the current playback position (offset into the track in seconds).
         """
-        LoudnessLengthWithPitchVisualizer.visualize(self.strip, self.num_pixels, loudness_func, pitch_funcs, pos)
+        LoudnessLengthFadeToRedVisualizer.visualize(self.strip, self.num_pixels, loudness_func, pitch_funcs, pos)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
@@ -445,7 +445,6 @@ class SpotifyVisualizer:
 
 if __name__ == "__main__":
     args = sys.argv
-
     # If developer mode option is specified, update setting; if not, default to False
     if len(args) > 1:
         developer_mode = bool(args[1])
@@ -456,7 +455,10 @@ if __name__ == "__main__":
     # Instantiate the appropriate visualizer device based on the developer mode setting
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
-        from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
+        # Original vs New Visualizations
+        # from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
+        from Visualizations.LoudnessLengthFadeToRedVisualizer import LoudnessLengthFadeToRedVisualizer
+
         visualization_device = VirtualVisualizer()
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
         t = threading.Thread(target=spotify_visualizer.launch_visualizer)
@@ -466,4 +468,4 @@ if __name__ == "__main__":
         import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
-        spotify_visualizer.visualize()
+        spotify_visualizer.launch_visualizer()
