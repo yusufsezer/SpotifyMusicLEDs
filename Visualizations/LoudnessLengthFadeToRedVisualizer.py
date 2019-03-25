@@ -25,7 +25,7 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
 
 
         #Full strip fill threshold
-        color_threshold = 0.75
+        color_threshold = 0.60
         length_threshold = 0.90
         # Fading background color to white if over 0.75
         if norm_loudness > color_threshold:
