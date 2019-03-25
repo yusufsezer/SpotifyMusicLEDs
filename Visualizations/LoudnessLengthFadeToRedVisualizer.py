@@ -32,7 +32,7 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
             start_color = LoudnessLengthFadeToRedVisualizer\
                 .apply_gradient_fade((155, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
             end_colors = LoudnessLengthFadeToRedVisualizer \
-                .apply_gradient_fade((0, 255, 0), (norm_loudness - color_threshold) / (1 - color_threshold),
+                .apply_gradient_fade((255, 255, 255), (norm_loudness - color_threshold) / (1 - color_threshold),
                                      start_color)
 
         print("%f: %f" % (pos, norm_loudness))
