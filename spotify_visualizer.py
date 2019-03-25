@@ -6,6 +6,8 @@ import spotipy.util as util
 import sys
 import threading
 import time
+from Visualizations.LoudnessLengthFadeToRedVisualizer import LoudnessLengthFadeToRedVisualizer
+from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
 
 __author__ = "Yusuf Sezer"
 
@@ -455,10 +457,6 @@ if __name__ == "__main__":
     # Instantiate the appropriate visualizer device based on the developer mode setting
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
-        # Original vs New Visualizations
-        # from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
-        from Visualizations.LoudnessLengthFadeToRedVisualizer import LoudnessLengthFadeToRedVisualizer
-
         visualization_device = VirtualVisualizer()
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
         t = threading.Thread(target=spotify_visualizer.launch_visualizer)
