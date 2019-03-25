@@ -24,17 +24,18 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
 
 
         #Full strip fill threshold
-        threshold = 0.85
+        color_threshold = 0.75
+        length_threshold = 0.90
         # Fading background color to white if over 0.75
-        if norm_loudness > threshold:
+        if norm_loudness > color_threshold:
             start_color = LoudnessLengthFadeToRedVisualizer\
-                .apply_gradient_fade((155, 0, 0), (norm_loudness-threshold)/(1-threshold), start_color)
+                .apply_gradient_fade((155, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
 
         print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
         mid = num_pixels // 2
-        length = int(num_pixels * min(1, norm_loudness))
+        length = int(num_pixels * min(1, norm_loudness/length_threshold))
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
         brightness = 100
