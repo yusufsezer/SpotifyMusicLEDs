@@ -17,7 +17,8 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
 
         start_color = (0, 0, 255)
 
-        end_colors = (255, 211, 62)
+        end_colors = (255, 255, 255)
+        # end_colors = (255, 211, 62)
 
         # Get normalized loudness value for current playback position
         norm_loudness = Visualizer.normalize_loudness(loudness_func(pos))
