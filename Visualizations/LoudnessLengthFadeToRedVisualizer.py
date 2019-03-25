@@ -30,7 +30,7 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
         # Fading background color to white if over 0.75
         if norm_loudness > color_threshold:
             start_color = LoudnessLengthFadeToRedVisualizer\
-                .apply_gradient_fade((80, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
+                .apply_gradient_fade((120, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
 
         print("%f: %f" % (pos, norm_loudness))
 
