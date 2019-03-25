@@ -34,7 +34,7 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
 
         # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
         mid = num_pixels // 2
-        length = int(num_pixels * min(1, norm_loudness / threshold))
+        length = int(num_pixels * min(1, norm_loudness))
         lower = mid - round(length / 2)
         upper = mid + round(length / 2)
         brightness = 100
