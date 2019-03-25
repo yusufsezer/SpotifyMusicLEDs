@@ -127,7 +127,7 @@ class SpotifyVisualizer:
         text = "Loaded track: {} by {}.".format(track_name, artists)
         print(SpotifyVisualizer._make_text_effect(text, ["green"]))
         self.track_duration = self.track["item"]["duration_ms"] / 1000
-        self._reset_track()
+        # self._reset_track()
         self._load_track_data()
 
     def sync(self):
@@ -185,7 +185,7 @@ class SpotifyVisualizer:
                 text = "Error occurred while checking if track has changed...retrying in {} seconds.".format(wait)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
             time.sleep(wait)
-        self.sp_skip.pause_playback()
+        # self.sp_skip.pause_playback()
         self.should_terminate = True
         text = "A skip has occurred."
         print(SpotifyVisualizer._make_text_effect(text, ["blue", "bold"]))
