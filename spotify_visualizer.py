@@ -134,8 +134,9 @@ class SpotifyVisualizer:
         """Syncs visualizer with Spotify playback. Called asynchronously (worker thread).
         """
         track_progress = self.sp_sync.current_user_playing_track()["progress_ms"] / 1000
-        text = "Syncing track to position: {}.".format(track_progress)
-        print(SpotifyVisualizer._make_text_effect(text, ["green", "bold"]))
+        text = "Syncing track to position: {}. \r".format(track_progress)
+        sys.stdout.write(SpotifyVisualizer._make_text_effect(text, ["green", "bold"]))
+        sys.stdout.flush()
         self.pos_lock.acquire()
         self.playback_pos = track_progress
         self.pos_lock.release()

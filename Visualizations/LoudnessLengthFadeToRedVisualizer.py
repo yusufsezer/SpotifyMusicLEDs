@@ -32,7 +32,7 @@ class LoudnessLengthFadeToRedVisualizer(Visualizer):
             start_color = LoudnessLengthFadeToRedVisualizer\
                 .apply_gradient_fade((120, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
 
-        print("%f: %f" % (pos, norm_loudness))
+        # print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
         mid = num_pixels // 2

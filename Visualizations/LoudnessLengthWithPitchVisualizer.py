@@ -33,7 +33,7 @@ class LoudnessLengthWithPitchVisualizer(Visualizer):
 
         # Get normalized loudness value for current playback position
         norm_loudness = Visualizer.normalize_loudness(loudness_func(pos))
-        print("%f: %f" % (pos, norm_loudness))
+        # print("%f: %f" % (pos, norm_loudness))
 
         # Determine how many pixels to light (growing from the center of the strip) based on normalized loudness
         mid = num_pixels // 2
