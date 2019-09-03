@@ -1,6 +1,12 @@
 class Visualizer:
-    @staticmethod
-    def visualize():
+
+    def __init__(self, strip, num_pixels, primary_color=(0, 0, 255), secondary_color=(255, 211, 62)):
+        self.strip = strip
+        self.num_pixels = num_pixels
+        self.primary_color = primary_color
+        self.secondary_color = secondary_color
+
+    def visualize(self):
         raise NotImplementedError("All visualizations must have a custom 'visualize' method.")
 
     @staticmethod
@@ -45,3 +51,8 @@ class Visualizer:
         faded_b = start_b + int(strength * b_diff)
 
         return faded_r, faded_g, faded_b
+
+
+    def reset(self):
+        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
+        self.strip.show()

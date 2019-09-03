@@ -6,7 +6,7 @@ import spotipy.util as util
 import sys
 import threading
 import time
-from Visualizations.LoudnessLengthFadeToRedVisualizer import LoudnessLengthFadeToRedVisualizer
+from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 from Visualizations.LoudnessLengthWithPitchVisualizer import LoudnessLengthWithPitchVisualizer
 
 __author__ = "Yusuf Sezer"
@@ -40,15 +40,14 @@ class SpotifyVisualizer:
         python3 spotify_visualizer.py True
 
     Args:
-        num_pixels (int): The number of pixels (LEDs) supported by the LED strip.
+        visualizer (Visualizer): The visualizer object that determines how the lights will be animated. it
+            also holds information about the device being run on.
 
     Attributes:
             buffer_lock (threading.Lock): a lock for accessing/modifying the interpolated function buffers.
             data_segments (list): data segments to be parsed and analyzed (fetched from Spotify API).
-            end_colors (dict): a dict of 12 RGB 3-tuples; maps pitch zone indices to the end-gradient-color of the zone.
             interpolated_loudness_buffer (list): producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): producer-consumer buffer holding lists of interpolated pitch functions.
-            num_pixels (int): the number of pixels (LEDs) on the LED strip.
             permission_scopes (str): a space-separated string of the required permission scopes over the user's account.
             playback_pos (float): the current playback position (offset into track in seconds) of the visualization.
             pos_lock (threading.Lock): a lock for accessing/modifying playback_pos.
@@ -59,40 +58,25 @@ class SpotifyVisualizer:
             sp_sync (Spotify): Spotify object to handle synchronization thread's interaction with the Spotify API.
             sp_vis (Spotify): Spotify object to handle visualization thread's interaction with the Spotify API.
             start_color (tuple): a 3-tuple of ints for the RGB value representing the start color of the pitch gradient.
-            strip (APA102): APA102 object to handle interfacing with the LED strip.
             track (dict): contains information about the track that is being visualized.
             track_duration (float): the duration in seconds of the track that is being visualized.
+            visualizer (Visualizer): the visualization that holds the logic for the animation to be used.
     """
 
-    def __init__(self, num_pixels, device):
+    def __init__(self, visualizer):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
-        self.end_colors = {
-            0: (0xFF, 0xFF, 0xFF),
-            1: (0xF5, 0xE7, 0xE7),
-            2: (0xEC, 0xD0, 0xD0),
-            3: (0xE3, 0xB9, 0xB9),
-            4: (0xD9, 0xA2, 0xA2),
-            5: (0xD0, 0x8B, 0x8B),
-            6: (0xC7, 0x73, 0x73),
-            7: (0xBE, 0x5C, 0x5C),
-            8: (0xB4, 0x45, 0x45),
-            9: (0xAB, 0x2E, 0x2E),
-            10: (0xA2, 0x17, 0x17),
-            11: (0x99, 0, 0)
-        }
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
-        self.num_pixels = num_pixels
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
         self.should_terminate = False
         self.sp_gen = self.sp_load = self.sp_skip = self.sp_sync = self.sp_vis = None
         self.start_color = (0, 0, 255)
-        self.strip = device
         self.track = None
         self.track_duration = None
+        self.visualizer = visualizer
 
     def authorize(self):
         """Handle the authorization workflow for the Spotify API.
@@ -373,7 +357,7 @@ class SpotifyVisualizer:
             pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
             pos (float): the current playback position (offset into the track in seconds).
         """
-        LoudnessLengthFadeToRedVisualizer.visualize(self.strip, self.num_pixels, loudness_func, pitch_funcs, pos)
+        self.visualizer.visualize(loudness_func, pitch_funcs, pos)
 
     def _reset(self):
         """Reset certain attributes to prepare to visualize a new track.
@@ -383,11 +367,10 @@ class SpotifyVisualizer:
         self.interpolated_pitch_buffer = []
         self.playback_pos = 0
         self.should_terminate = False
-        self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
-        self.strip.show()
         self.track = None
         self.track_duration = None
         self.track_id = None
+        self.visualizer.reset()
 
     def _reset_track(self):
         """Pauses track and seeks to beginning.
@@ -432,8 +415,8 @@ class SpotifyVisualizer:
                 if funcs:
                     loudness_func, pitch_funcs = funcs
             # Unexpected error...retry
-            except:
-                text = "Unexpected error in visualization thread...retrying..."
+            except Exception as e:
+                text = f"Unexpected error in visualization thread: {e} \nRetrying..."
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
 
             self.pos_lock.acquire()
@@ -459,12 +442,14 @@ if __name__ == "__main__":
     if developer_mode:
         from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
-        spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
+        visualizer = LoudnessLengthEdgeFadeVisualizer(visualization_device, n_pixels)
+        spotify_visualizer = SpotifyVisualizer(visualizer)
         t = threading.Thread(target=spotify_visualizer.launch_visualizer)
         t.start()
         visualization_device.start_visualization()
     else:
         import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
+        visualizer = LoudnessLengthEdgeFadeVisualizer(visualizer)
         spotify_visualizer = SpotifyVisualizer(n_pixels, visualization_device)
         spotify_visualizer.launch_visualizer()

@@ -14,10 +14,6 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
                     pos (float): the current playback position (offset into the track in seconds).
                 """
 
-        start_color = self.primary_color # (0, 0, 255)
-
-        end_colors = self.secondary_color # (255, 211, 62)
-
         # Get normalized loudness value for current playback position
         norm_loudness = Visualizer.normalize_loudness(loudness_func(pos))
 
@@ -25,7 +21,8 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
         #Full strip fill threshold
         color_threshold = 0.75
         length_threshold = 0.85
-        # Fading background color to white if over 0.75
+        # Fading background color to (RED, hardcoded) if over 0.75
+        start_color = self.primary_color # (0, 0, 255)
         if norm_loudness > color_threshold:
             start_color = LoudnessLengthEdgeFadeVisualizer\
                 .apply_gradient_fade((120, 0, 0), (norm_loudness-color_threshold)/(1-color_threshold), start_color)
@@ -52,7 +49,7 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
             segment_mid = start + (segment_len // 2)
 
             # Get the appropriate color based on the current pitch zone and pitch strength
-            zone_r, zone_g, zone_b = self._calculate_zone_color(pitch_strength)
+            zone_r, zone_g, zone_b = self._calculate_zone_color(pitch_strength, start_color, self.secondary_color)
 
             # Fade the strength of the RGB values near the ends of the zone to produce a nice gradient effect
             for j in range(start, end + 1):
@@ -68,7 +65,7 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
         self.strip.fill(upper, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
 
-    def _calculate_zone_color(self, pitch_strength):
+    def _calculate_zone_color(self, pitch_strength, start_color, end_color):
         """Calculate the color to visualize based on the pitch/zone index and corresponding pitch strength.
 
         The visualizer divides the lit portion of the strip into 12 equal-length zones, one for each of the 12 major
@@ -87,8 +84,8 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
         elif pitch_strength > 1.0:
             pitch_strength = 1.0
 
-        start_r, start_g, start_b = self.primary_color
-        end_r, end_g, end_b = self.secondary_color
+        start_r, start_g, start_b = start_color
+        end_r, end_g, end_b = end_color
         r_diff, g_diff, b_diff = end_r - start_r, end_g - start_g, end_b - start_b
 
         r = start_r + int(pitch_strength * r_diff)
