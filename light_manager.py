@@ -1,9 +1,11 @@
+import git
 import sys
 import threading
 import time
 
 import boto3 as AWS
 from credentials import AWS_ACCESS_KEY, AWS_SECRET_KEY, USER
+from dynamodb_client import DynamoDBClient
 from spotify_visualizer import SpotifyVisualizer
 from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
@@ -32,6 +34,7 @@ def manage(dev_mode):
     pi or a developer's machine.
 
     """
+    dynamoDBClient = DynamoDBClient()
     base_color = None # We always want to update the lights on first start.
     visualizer_thread = None
     n_pixels = 240
@@ -39,22 +42,9 @@ def manage(dev_mode):
     spotify_visualizer = None
 
     while True:
-        client = AWS.client(
-            'dynamodb',
-            region_name='us-east-1',
-            aws_access_key_id=AWS_ACCESS_KEY,
-            aws_secret_access_key=AWS_SECRET_KEY
-        )
-        item = client.get_item(
-            TableName="SpotifyVisualizerUsers",
-            Key={
-                'user_id': {
-                    'S': USER
-                }
-            }
-        )['Item']
+        record = dynamoDBClient.get_record()
 
-        settings = item['settings']['M']
+        settings = record['settings']['M']
         base_color_r = int(settings['baseColorRedValue']['N'])
         base_color_g = int(settings['baseColorGreenValue']['N'])
         base_color_b = int(settings['baseColorBlueValue']['N'])
@@ -64,17 +54,13 @@ def manage(dev_mode):
                 visualizer.set_primary_color(new_base_color)
             base_color = new_base_color
 
-        if bool(item['shouldRestart']['BOOL']):
-            # base_color = new_base_color
-            # if spotify_visualizer:
-            #     spotify_visualizer.terminate_visualizer()
-            #     while visualizer_thread.is_alive():
-            #         print("Waiting for visualizer to terminate...")
-            #         time.sleep(1)
-            pass
-            # TODO: The logic above is correct, we just need to be able to set
-            # the DynamoDB flag to false once we update. Keeping this disabled
-            # for now.
+        if bool(record['shouldRestart']['BOOL']):
+            if spotify_visualizer:
+                spotify_visualizer.terminate_visualizer()
+                while visualizer_thread.is_alive():
+                    print("Waiting for visualizer to terminate...")
+                    time.sleep(1)
+            dynamoDBClient.update_restart_flag()
 
 
         # If the animation has not been instantiated or the thread has
@@ -113,6 +99,17 @@ if __name__ == "__main__":
         developer_mode = bool(args[1])
     else:
         developer_mode = False
+
+    dynamoDBClient = DynamoDBClient()
+    record = dynamoDBClient.get_record()
+    settings = record['settings']['M']
+    git_branch = settings['gitBranch']['S']
+    git_commit = settings['gitCommitID']['S']
+
+    repo = git.Repo()
+    repo.git.fetch()
+    repo.git.checkout(git_branch)
+    repo.git.checkout(git_commit)
 
     manager_thread = threading.Thread(target=manage, name="manager_thread", args=(developer_mode,))
     manager_thread.start()
