@@ -52,7 +52,15 @@ class Visualizer:
 
         return faded_r, faded_g, faded_b
 
+    def get_visualization_device(self):
+        return self.strip
 
     def reset(self):
         self.strip.fill(0, self.num_pixels, 0, 0, 0, 0)
         self.strip.show()
+
+    def set_primary_color(self, color):
+        self.primary_color = color
+
+    def set_secondary_color(self, color):
+        self.secondary_color = color
