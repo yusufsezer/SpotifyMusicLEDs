@@ -1,6 +1,6 @@
 class Visualizer:
 
-    def __init__(self, strip, num_pixels, primary_color=(0, 0, 255), secondary_color=(255, 211, 62)):
+    def __init__(self, strip, num_pixels, primary_color=(0, 0, 255), secondary_color=(255, 255, 255)):
         self.strip = strip
         self.num_pixels = num_pixels
         self.primary_color = primary_color
