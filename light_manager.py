@@ -6,9 +6,6 @@ import time
 import boto3 as AWS
 from credentials import AWS_ACCESS_KEY, AWS_SECRET_KEY, USER
 from dynamodb_client import DynamoDBClient
-from spotify_visualizer import SpotifyVisualizer
-from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
-
 
 def _init_visualizer(dev_mode, n_pixels, base_color):
     if dev_mode:
@@ -62,7 +59,6 @@ def manage(dev_mode):
                     time.sleep(1)
             dynamoDBClient.update_restart_flag()
 
-
         # If the animation has not been instantiated or the thread has
         # completed (i.e. we killed it), we need to reinstantiate and restart.
         if not visualizer_thread or not visualizer_thread.is_alive():
@@ -110,6 +106,10 @@ if __name__ == "__main__":
     repo.git.fetch()
     repo.git.checkout(git_branch)
     repo.git.checkout(git_commit)
+
+    # MUST do these imports AFTER git commands to ensure that the new source code changes are picked up
+    from spotify_visualizer import SpotifyVisualizer
+    from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
     manager_thread = threading.Thread(target=manage, name="manager_thread", args=(developer_mode,))
     manager_thread.start()
