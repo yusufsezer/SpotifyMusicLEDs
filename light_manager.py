@@ -1,11 +1,11 @@
-import git
 import sys
 import threading
 import time
 
-import boto3 as AWS
 from credentials import AWS_ACCESS_KEY, AWS_SECRET_KEY, USER
 from dynamodb_client import DynamoDBClient
+from spotify_visualizer import SpotifyVisualizer
+from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
 def _init_visualizer(dev_mode, n_pixels, base_color):
     if dev_mode:
@@ -95,21 +95,6 @@ if __name__ == "__main__":
         developer_mode = bool(args[1])
     else:
         developer_mode = False
-
-    dynamoDBClient = DynamoDBClient()
-    record = dynamoDBClient.get_record()
-    settings = record['settings']['M']
-    git_branch = settings['gitBranch']['S']
-    git_commit = settings['gitCommitID']['S']
-
-    repo = git.Repo()
-    repo.git.fetch()
-    repo.git.checkout(git_branch)
-    repo.git.checkout(git_commit)
-
-    # MUST do these imports AFTER git commands to ensure that the new source code changes are picked up
-    from spotify_visualizer import SpotifyVisualizer
-    from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
     manager_thread = threading.Thread(target=manage, name="manager_thread", args=(developer_mode,))
     manager_thread.start()
