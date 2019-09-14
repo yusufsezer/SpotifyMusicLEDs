@@ -12,7 +12,7 @@ def _init_visualizer(dev_mode, n_pixels, base_color):
         from virtual_visualizer import VirtualVisualizer
         visualization_device = VirtualVisualizer()
     else:
-        import apa102
+        from driver import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
 
     visualizer = LoudnessLengthEdgeFadeVisualizer(visualization_device, n_pixels, base_color)
