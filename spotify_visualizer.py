@@ -1,6 +1,7 @@
 import boto3 as AWS
 from credentials import USERNAME, SPOTIPY_CLIENT_ID, SPOTIPY_CLIENT_SECRET, SPOTIPY_REDIRECT_URI, AWS_ACCESS_KEY,\
     AWS_SECRET_KEY
+from dynamodb_client import DynamoDBClient
 import numpy as np
 from scipy.interpolate import interp1d
 import spotipy
@@ -123,7 +124,11 @@ class SpotifyVisualizer:
     def sync(self):
         """Syncs visualizer with Spotify playback. Called asynchronously (worker thread).
         """
-        track_progress = self.sp_sync.current_user_playing_track()["progress_ms"] / 1000
+        spotify_response = None
+        while not spotify_response:
+            spotify_response = self.sp_sync.current_user_playing_track()
+            time.sleep(0.5)
+        track_progress = spotify_response["progress_ms"] / 1000
         text = "Syncing track to position: {}. \r".format(track_progress)
         sys.stdout.write(SpotifyVisualizer._make_text_effect(text, ["green", "bold"]))
         sys.stdout.flush()
@@ -164,7 +169,7 @@ class SpotifyVisualizer:
 
         Sends a signal to all subthreads and the main visualizer thread that
         kills them. This is used if an update is required.
-        
+
         """
         self.should_terminate = True
         self.song_ended = True
@@ -190,7 +195,6 @@ class SpotifyVisualizer:
                 text = "Error occurred while checking if track has changed...retrying in {} seconds.".format(wait)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
             time.sleep(wait)
-        # self.sp_skip.pause_playback()
         self.song_ended = True
         text = "A skip has occurred."
         print(SpotifyVisualizer._make_text_effect(text, ["blue", "bold"]))
@@ -450,21 +454,9 @@ class SpotifyVisualizer:
 
 
 if __name__ == "__main__":
-    # Load settings
-    client = AWS.client(
-        'dynamodb',
-        region_name='us-east-1',
-        aws_access_key_id=AWS_ACCESS_KEY,
-        aws_secret_access_key=AWS_SECRET_KEY
-    )
-    settings = client.get_item(
-        TableName="SpotifyVisualizerUsers",
-        Key={
-            'user_id': {
-                'S': 'Yusuf'
-            }
-        }
-    )['Item']['settings']['M']
+    # Fetch settings from DynamoDB
+    dynamo_dao = DynamoDBClient()
+    settings = dynamo_dao.get_record()['settings']['M']
 
     base_color_r = int(settings['baseColorRedValue']['N'])
     base_color_g = int(settings['baseColorGreenValue']['N'])
