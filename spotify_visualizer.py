@@ -481,38 +481,3 @@ class SpotifyVisualizer:
             # Account for time used to create visualization
             diff = sample_rate - (end - start)
             time.sleep(diff if diff > 0 else 0)
-
-
-if __name__ == "__main__":
-    # Fetch settings from DynamoDB
-    dynamo_dao = DynamoDBClient()
-    settings = dynamo_dao.get_record()['settings']['M']
-
-    base_color_r = int(settings['baseColorRedValue']['N'])
-    base_color_g = int(settings['baseColorGreenValue']['N'])
-    base_color_b = int(settings['baseColorBlueValue']['N'])
-    base_color = (base_color_r, base_color_g, base_color_b)
-
-    # If developer mode option is specified, update setting; if not, default to False
-    args = sys.argv
-    if len(args) > 1:
-        developer_mode = bool(args[1])
-    else:
-        developer_mode = False
-
-    n_pixels = 240
-    # Instantiate the appropriate visualizer device based on the developer mode setting
-    if developer_mode:
-        from virtual_visualizer import VirtualVisualizer
-        visualization_device = VirtualVisualizer()
-        visualizer = LoudnessLengthEdgeFadeVisualizer(visualization_device, n_pixels, base_color)
-        spotify_visualizer = SpotifyVisualizer(visualizer)
-        t = threading.Thread(target=spotify_visualizer.launch_visualizer)
-        t.start()
-        visualization_device.start_visualization()
-    else:
-        import apa102
-        visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
-        visualizer = LoudnessLengthEdgeFadeVisualizer(visualization_device, n_pixels, base_color)
-        spotify_visualizer = SpotifyVisualizer(visualizer)
-        spotify_visualizer.launch_visualizer()
