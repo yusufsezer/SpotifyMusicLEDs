@@ -43,14 +43,16 @@ class SpotifyVisualizer:
         python3 spotify_visualizer.py True
 
     Args:
-        visualizer (Visualizer): The visualizer object that determines how the lights will be animated. it
+        visualizer (Visualizer): The visualizer object that determines how the lights will be animated. It
             also holds information about the device being run on.
+        loading_anim_visualizer (Animation): The animation object that displays a loading animation.
 
     Attributes:
             buffer_lock (threading.Lock): a lock for accessing/modifying the interpolated function buffers.
             data_segments (list): data segments to be parsed and analyzed (fetched from Spotify API).
             interpolated_loudness_buffer (list): producer-consumer buffer holding interpolated loudness functions.
             interpolated_pitch_buffer (list): producer-consumer buffer holding lists of interpolated pitch functions.
+            loading_animator (Animator): a loading bar animator that replaces the visualizer when track is paused or loading.
             permission_scopes (str): a space-separated string of the required permission scopes over the user's account.
             playback_pos (float): the current playback position (offset into track in seconds) of the visualization.
             pos_lock (threading.Lock): a lock for accessing/modifying playback_pos.
@@ -66,11 +68,13 @@ class SpotifyVisualizer:
             visualizer (Visualizer): the visualization that holds the logic for the animation to be used.
     """
 
-    def __init__(self, visualizer):
+    def __init__(self, visualizer, loading_animator):
         self.buffer_lock = threading.Lock()
         self.data_segments = []
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
+        self.is_playing = True
+        self.loading_animator = loading_animator
         self.permission_scopes = "user-modify-playback-state user-read-currently-playing user-read-playback-state"
         self.playback_pos = 0
         self.pos_lock = threading.Lock()
@@ -97,6 +101,7 @@ class SpotifyVisualizer:
             self.sp_sync = spotipy.Spotify(auth=token)
             self.sp_load = spotipy.Spotify(auth=token)
             self.sp_skip = spotipy.Spotify(auth=token)
+            self.sp_pause = spotipy.Spotify(auth=token)
             text = "Successfully connected to {}'s account.".format(self.sp_gen.me()["display_name"])
             print(SpotifyVisualizer._make_text_effect(text, ["green"]))
         else:
@@ -118,7 +123,7 @@ class SpotifyVisualizer:
         text = "Loaded track: {} by {}.".format(track_name, artists)
         print(SpotifyVisualizer._make_text_effect(text, ["green"]))
         self.track_duration = self.track["item"]["duration_ms"] / 1000
-        # self._reset_track()
+        self.is_playing = self.track["is_playing"]
         self._load_track_data()
 
     def sync(self):
@@ -153,7 +158,8 @@ class SpotifyVisualizer:
                 threading.Thread(target=self._visualize, name="[VISUALIZER] visualize_thread"),
                 threading.Thread(target=self._continue_loading_data, name="[VISUALIZER] data_load_thread"),
                 threading.Thread(target=self._continue_syncing, name="[VISUALIZER] sync_thread"),
-                threading.Thread(target=self._continue_checking_if_skip, name="[VISUALIZER] skipping_thread")
+                threading.Thread(target=self._continue_checking_if_skip, name="[VISUALIZER] skipping_thread"),
+                threading.Thread(target=self._continue_checking_if_paused, name="[VISUALIZER] pause_thread")
             ]
             for thread in threads:
                 thread.start()
@@ -174,6 +180,21 @@ class SpotifyVisualizer:
         self.should_terminate = True
         self.song_ended = True
 
+    def _continue_checking_if_paused(self, wait=0.33):
+        """Continuously checks if user's playback is paused, and updates self.is_playing accordingly.
+
+        If the user's playback is paused, we should display an animation on the strip until playback resumes.
+
+        Args:
+            wait (float): the amount of time in seconds to wait between each check.
+        """
+        while not self.song_ended:
+            try:
+                self.is_playing = self.sp_pause.current_playback()["is_playing"]
+            except:
+                text = "Error occurred while checking if playback is paused...retrying in {} seconds.".format(wait)
+                print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
+
     def _continue_checking_if_skip(self, wait=0.33):
         """Continuously checks if the user's playing track has changed. Called asynchronously (worker thread).
 
@@ -190,7 +211,9 @@ class SpotifyVisualizer:
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
                 exit(0)
             try:
-                track = self.sp_skip.current_user_playing_track()
+                spotify_response = self.sp_skip.current_user_playing_track()
+                assert(spotify_response is not None)
+                track = spotify_response
             except:
                 text = "Error occurred while checking if track has changed...retrying in {} seconds.".format(wait)
                 print(SpotifyVisualizer._make_text_effect(text, ["red", "bold"]))
@@ -389,6 +412,7 @@ class SpotifyVisualizer:
         self.data_segments = []
         self.interpolated_loudness_buffer = []
         self.interpolated_pitch_buffer = []
+        self.is_playing = True
         self.playback_pos = 0
         self.song_ended = False
         self.track = None
@@ -417,6 +441,7 @@ class SpotifyVisualizer:
         try:
             if not self.sp_vis.current_playback()["is_playing"]:
                 self.sp_vis.start_playback()
+                self.is_playing = True
         except:
             pass
 
@@ -429,8 +454,11 @@ class SpotifyVisualizer:
                 exit(0)
 
             try:
-                pos = self.playback_pos
-                self._push_visual_to_strip(loudness_func, pitch_funcs, pos)
+                if self.is_playing:
+                    pos = self.playback_pos
+                    self._push_visual_to_strip(loudness_func, pitch_funcs, pos)
+                else:
+                    self.loading_animator.animate() # play one frame of animation
             # If pitch or loudness value out of range, find the interpolated functions for the current position
             except ValueError as err:
                 text = "Caught ValueError: {}\nSearching for interpolated funcs for current position...".format(err)
@@ -438,6 +466,8 @@ class SpotifyVisualizer:
                 funcs = self._get_buffers_for_pos(pos)
                 if funcs:
                     loudness_func, pitch_funcs = funcs
+                else:
+                    self.loading_animator.animate()
             # Unexpected error...retry
             except Exception as e:
                 text = f"Unexpected error in visualization thread: {e} \nRetrying..."

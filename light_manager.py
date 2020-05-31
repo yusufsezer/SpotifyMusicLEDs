@@ -5,6 +5,7 @@ import time
 from credentials import AWS_ACCESS_KEY, AWS_SECRET_KEY, USER
 from dynamodb_client import DynamoDBClient
 from spotify_visualizer import SpotifyVisualizer
+from Visualizations.LoadingAnimator import LoadingAnimator
 from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
 def _init_visualizer(dev_mode, n_pixels, base_color):
@@ -16,7 +17,8 @@ def _init_visualizer(dev_mode, n_pixels, base_color):
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
 
     visualizer = LoudnessLengthEdgeFadeVisualizer(visualization_device, n_pixels, base_color)
-    return visualizer
+    loading_animator = LoadingAnimator(visualization_device, n_pixels)
+    return (visualizer, loading_animator)
 
 
 def manage(dev_mode):
@@ -62,8 +64,8 @@ def manage(dev_mode):
         # If the animation has not been instantiated or the thread has
         # completed (i.e. we killed it), we need to reinstantiate and restart.
         if not visualizer_thread or not visualizer_thread.is_alive():
-            visualizer = _init_visualizer(developer_mode, n_pixels, base_color)
-            spotify_visualizer = SpotifyVisualizer(visualizer)
+            visualizer, loading_animator = _init_visualizer(developer_mode, n_pixels, base_color)
+            spotify_visualizer = SpotifyVisualizer(visualizer, loading_animator)
             visualizer_thread = threading.Thread(target=spotify_visualizer.launch_visualizer, name="visualizer_thread")
             visualizer_thread.start()
 
