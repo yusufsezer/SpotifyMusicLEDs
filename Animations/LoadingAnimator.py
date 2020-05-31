@@ -1,4 +1,4 @@
-from Visualizations.Animator import Animator
+from Animations.Animator import Animator
 
 _author_ = "Yusuf Sezer"
 

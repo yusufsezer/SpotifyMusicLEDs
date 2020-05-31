@@ -2,10 +2,10 @@ import sys
 import threading
 import time
 
+from Animations.LoadingAnimator import LoadingAnimator
 from credentials import AWS_ACCESS_KEY, AWS_SECRET_KEY, USER
 from dynamodb_client import DynamoDBClient
 from spotify_visualizer import SpotifyVisualizer
-from Visualizations.LoadingAnimator import LoadingAnimator
 from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFadeVisualizer
 
 def _init_visualizer(dev_mode, n_pixels, base_color):
