@@ -6,13 +6,13 @@ class LoudnessLengthEdgeFadeVisualizer(Visualizer):
     def visualize(self, loudness_func, pitch_funcs, pos):
         """Displays a visual on the LED strip based on the loudness and pitch data at current playback position.
 
-                Args:
-                    strip (strip obj): light strip or visualization including 'set_pixel' and 'fill'.
-                    num_pixels (int): the number of LEDs on the strip.
-                    loudness_func (interp1d): interpolated loudness function.
-                    pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
-                    pos (float): the current playback position (offset into the track in seconds).
-                """
+        Args:
+            strip (strip obj): light strip or visualization including 'set_pixel' and 'fill'.
+            num_pixels (int): the number of LEDs on the strip.
+            loudness_func (interp1d): interpolated loudness function.
+            pitch_funcs (list): a list of interpolated pitch functions (one pitch function for each major musical key).
+            pos (float): the current playback position (offset into the track in seconds).
+        """
 
         # Get normalized loudness value for current playback position
         norm_loudness = Visualizer.normalize_loudness(loudness_func(pos))

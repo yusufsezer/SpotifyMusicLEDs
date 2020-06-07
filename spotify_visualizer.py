@@ -124,7 +124,7 @@ class SpotifyVisualizer:
         print(SpotifyVisualizer._make_text_effect(text, ["green"]))
         self.track_duration = self.track["item"]["duration_ms"] / 1000
         self.is_playing = self.track["is_playing"]
-        self._load_track_data()
+        # self._load_track_data()
 
     def sync(self):
         """Syncs visualizer with Spotify playback. Called asynchronously (worker thread).
@@ -228,6 +228,25 @@ class SpotifyVisualizer:
         Args:
             wait (float): the amount of time in seconds to wait between each call to _load_track_data().
         """
+        # If necessary, get audio data for the track from the Spotify API and pad data to cover the full track length
+        if not self.data_segments:
+            analysis = self.sp_load.audio_analysis(self.track["item"]["id"])
+            self.data_segments.append(
+                {
+                    "start": -0.1,
+                    "loudness_start": -25.0,
+                    "pitches": 12*[0]
+                }
+            )
+            self.data_segments += analysis["segments"]
+            self.data_segments.append(
+                {
+                    "start": self.track_duration + 0.1,
+                    "loudness_start": -25.0, "pitches": 12*[0]
+                }
+            )
+
+        # Continue preparing track data until self.data_segments is exhausted
         while len(self.data_segments) != 0 and not self.song_ended:
             try:
                 self._load_track_data()
@@ -301,24 +320,6 @@ class SpotifyVisualizer:
         Args:
             chunk_length (float): the number of seconds of track data to analyze.
         """
-        # If necessary, get audio data for the track from the Spotify API and pad data to cover the full track length
-        if not self.data_segments:
-            analysis = self.sp_load.audio_analysis(self.track["item"]["id"])
-            self.data_segments.append(
-                {
-                    "start": -0.1,
-                    "loudness_start": -25.0,
-                    "pitches": 12*[0]
-                }
-            )
-            self.data_segments += analysis["segments"]
-            self.data_segments.append(
-                {
-                    "start": self.track_duration + 0.1,
-                    "loudness_start": -25.0, "pitches": 12*[0]
-                }
-            )
-
         # Extract the next chunk_length seconds of useful loudness and pitch data
         s_t, l, pitch_lists = [], [], []
         i = 0
@@ -436,7 +437,7 @@ class SpotifyVisualizer:
             sample_rate (float): how long to wait (in seconds) between each sample.
         """
         pos = self.playback_pos
-        loudness_func, pitch_funcs = self._get_buffers_for_pos(pos)
+        loudness_func,pitch_funcs = None, None
 
         try:
             if not self.sp_vis.current_playback()["is_playing"]:
@@ -454,9 +455,13 @@ class SpotifyVisualizer:
                 exit(0)
 
             try:
-                if self.is_playing:
+                if self.is_playing and loudness_func and pitch_funcs:
                     pos = self.playback_pos
                     self._push_visual_to_strip(loudness_func, pitch_funcs, pos)
+                elif not loudness_func or not pitch_funcs:
+                    funcs = self._get_buffers_for_pos(pos)
+                    loudness_func, pitch_funcs = funcs if funcs else (None, None)
+                    self.loading_animator.animate() # play one frame of animation
                 else:
                     self.loading_animator.animate() # play one frame of animation
             # If pitch or loudness value out of range, find the interpolated functions for the current position
