@@ -3,7 +3,7 @@ from PyQt5.QtGui import QPainter, QColor
 import sys
 
 
-class _VirtualVisualizer:
+class _VirtualLEDStrip:
     """A class for launching/controlling a virtual LED strip visualizer
 
     This class is intended for use with spotify_visualizer.py in developer mode.
@@ -63,20 +63,20 @@ class _VirtualVisualizer:
         self.visualization_widget.fill(start, end, r, g, b)
 
 
-_virtual_visualizer = _VirtualVisualizer()
-def VirtualVisualizer():
-    """A method to effectively make VirtualVisualizer a singleton class.
+_virtual_led_strip = _VirtualLEDStrip()
+def VirtualLEDStrip():
+    """A method to effectively make VirtualLEDStrip a singleton class.
 
-    We want VirtualVisualizer to be a singleton because no matter how many times
+    We want VirtualLEDStrip to be a singleton because no matter how many times
     we restart the visualization, the window created should stay the same.
     """
-    return _virtual_visualizer
+    return _virtual_led_strip
 
 
 class VisualizationWidget(QWidget):
     """A QWidget to handle initializing a UI and drawing.
 
-    This class is intended for use with VirtualVisualizer and spotify_visualizer.py in developer mode.
+    This class is intended for use with VirtualLEDStrip and spotify_visualizer.py in developer mode.
     """
 
     def __init__(self):

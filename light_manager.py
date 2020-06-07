@@ -10,8 +10,8 @@ from Visualizations.LoudnessLengthEdgeFadeVisualizer import LoudnessLengthEdgeFa
 
 def _init_visualizer(dev_mode, n_pixels, base_color):
     if dev_mode:
-        from virtual_visualizer import VirtualVisualizer
-        visualization_device = VirtualVisualizer()
+        from virtual_led_strip import VirtualLEDStrip
+        visualization_device = VirtualLEDStrip()
     else:
         from driver import apa102
         visualization_device = apa102.APA102(num_led=n_pixels, global_brightness=23, mosi=10, sclk=11, order='rgb')
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     Args:
         developer_mode (boolean): determines if visualizer should be run from
-    an actual lights strip or a virtual visualizer.
+        an actual lights strip or a virtual visualizer.
     """
 
     args = sys.argv
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     manager_thread.start()
 
     # If we are in developer mode, we need to use this main thread to start the
-    # VirutalVisualizer GUI. Since VirtualVisualizer is a singleton class, we
-    # can just reinstantiate the VirtualVisualizer
+    # VirutalVisualizer GUI. Since VirtualLEDStrip is a singleton class, we
+    # can just reinstantiate the VirtualLEDStrip
     if developer_mode:
-        from virtual_visualizer import VirtualVisualizer
-        VirtualVisualizer().start_visualization()
+        from virtual_led_strip import VirtualLEDStrip
+        VirtualLEDStrip().start_visualization()
